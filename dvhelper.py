@@ -36,7 +36,6 @@ sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 #endregion
 
 
-#region Base Classes
 @dataclass
 class Config:
 	# URLs
@@ -85,7 +84,8 @@ class Config:
 		'桜井ちんたろう',  'アベ', 'ゴロー', '優生', 'Qべぇ', '沢木和也', '岩下たろう', '戸川夏也', '松山伸也',
 		'タツ', 'テツ神山', '瀧口', '左曲かおる', '杉浦ボッ樹', 'ウルフ田中', 'ゆうき', 'ピエール剣', '一馬', '--',
 		'桐島達也', '七尾神', 'フランクフルト林', 'ナルシス小林', 'カルロス', 'たむらあゆむ', '橋本誠吾', '羽田貴史',
-		'森林原人',
+		'森林原人', 'およよ中野', 'ひょこり', '堀尾', 'しめじ', '太刀茜祢', '黒井ゆう', 'マサムー', 'レンジャー鏑木',
+		'ドピュー',
 	)
 
 	# argparse help messages
@@ -114,6 +114,7 @@ examples:
 '''
 
 
+#region Base Classes
 class TqdmOut:
 	"""用于将logging的stream输出重定向到tqdm"""
 	@classmethod
@@ -619,8 +620,8 @@ class DVHelper(MovieScraper):
 					logger.warning('❌未找到匹配的影片')
 					failed_movies.append(keyword)
 					continue
-				else:
-					step_pbar.update()
+
+				step_pbar.update()
 
 				# 2. 获取影片详情
 				step_pbar.set_description('获取影片详情')
@@ -631,19 +632,8 @@ class DVHelper(MovieScraper):
 					logger.warning('❌无法获取影片详情')
 					failed_movies.append(keyword)
 					continue
-				else:
-					step_pbar.update()
 
-				# 3. 解析影片详情
-				step_pbar.set_description('解析影片详情')
-				movie_details = MovieParser.parse_movie_details(response_text)
-
-				if not movie_details:
-					logger.warning('❌无法解析影片详情')
-					failed_movies.append(keyword)
-					continue
-				else:
-					step_pbar.update()
+				step_pbar.update()
 
 				movie_details.update({
 					'url': search_results['url'],
@@ -654,7 +644,7 @@ class DVHelper(MovieScraper):
 				movie_info = MovieInfo(movie_details)
 
 				# 3. 按演员组织目录结果并创建影片目录
-				step_pbar.set_description('创建目录')
+				step_pbar.set_description('创建影片目录')
 				actor_count = len(movie_info.actors)
 
 				if actor_count == 0:
@@ -676,8 +666,8 @@ class DVHelper(MovieScraper):
 					logger.warning('❌封面图片下载失败')
 					failed_movies.append(keyword)
 					continue
-				else:
-					step_pbar.update()
+
+				step_pbar.update()
 
 				# 5. 生成NFO文件
 				step_pbar.set_description(f'生成 NFO 文件')
@@ -687,11 +677,16 @@ class DVHelper(MovieScraper):
 
 				# 6. 移动影片源文件到整理后的文件夹并改名
 				if dir_mode:
-					step_pbar.set_description(f'移动文件')
+					step_pbar.set_description(f'移动影片文件')
+
 					old_path = Path(item)
 					new_path = movie_path / old_path.with_stem(movie_info.number).name.upper()
-					old_path.rename(new_path)
 
+					if new_path.exists():
+						logger.warning(f'❌影片文件已存在，请自行比较后手动操作。源文件：{root_dir / old_path}，目标文件：{new_path}')
+						continue
+
+					old_path.rename(new_path)
 					step_pbar.update()
 
 				logger.info(f'✔影片 {keyword} 相关文件已保存至 {movie_path}')
