@@ -22,6 +22,7 @@ from PIL import Image
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
+from tqdm import tqdm, trange
 
 # XML处理相关导入
 from xml.dom import minidom
@@ -47,6 +48,9 @@ class Config:
 	fanart_image: str = 'fanart.jpg'
 	poster_image: str = 'poster.jpg'
 	completed_path: str = '#整理完成#'
+	exclude_path: tuple[str] = (
+		completed_path,
+	)
 
 	# Regex pattern
 	ignored_keyword_pattern: list[str] = (
@@ -81,6 +85,7 @@ class Config:
 		'桜井ちんたろう',  'アベ', 'ゴロー', '優生', 'Qべぇ', '沢木和也', '岩下たろう', '戸川夏也', '松山伸也',
 		'タツ', 'テツ神山', '瀧口', '左曲かおる', '杉浦ボッ樹', 'ウルフ田中', 'ゆうき', 'ピエール剣', '一馬', '--',
 		'桐島達也', '七尾神', 'フランクフルト林', 'ナルシス小林', 'カルロス', 'たむらあゆむ', '橋本誠吾', '羽田貴史',
+		'森林原人',
 	)
 
 	# argparse help messages
@@ -107,6 +112,13 @@ examples:
       %(prog)s ABCDE-123 -l
       忽略已保存的Cookie，强制进行新的登录操作。
 '''
+
+
+class TqdmOut:
+	"""用于将logging的stream输出重定向到tqdm"""
+	@classmethod
+	def write(cls, s, file=None, nolock=False):
+		tqdm.write(s, file=file, end='', nolock=nolock)
 
 
 class HelpOnErrorParser(argparse.ArgumentParser):
@@ -447,7 +459,7 @@ class MovieScraper(object):
 		for retry in range(1, max_retries + 1):
 			current_timeout = initial_timeout * (backoff_factor ** (retry - 1))
 
-			if retry > 1:
+			if retry > max_retries:
 				print(f'第 {retry}/{max_retries} 次尝试（超时时间：{current_timeout} 秒）')
 
 			try:
@@ -462,13 +474,12 @@ class MovieScraper(object):
 				return response.text
 			except (RequestException, Timeout) as e:
 				if retry >= max_retries:
-					logger.error(f'网络请求失败：{str(e)}')
-					return None
+					return
 
 	def fetch_image(self, movie_path: Path, url: str, max_retries=3, initial_timeout=30, backoff_factor=2):
 		"""下载影片封面图片并进行裁剪
 
-		从指定地址下载影片封面图片，支持重试机制
+		从指定地址下载影片封面图片，支持重试机制，并显示下载进度
 
 		Args:
 			movie_path: 封面图片保存路径
@@ -483,23 +494,29 @@ class MovieScraper(object):
 		for retry in range(1, max_retries + 1):
 			current_timeout = initial_timeout * (backoff_factor ** (retry - 1))
 
-			if retry > 1:
+			if retry > max_retries:
 				print(f'第 {retry}/{max_retries} 次尝试（超时时间：{current_timeout} 秒）')
 
 			try:
 				response = requests.get(url, stream=True, timeout=current_timeout)
 				response.raise_for_status()
 
+				# 获取文件大小
+				total_size = int(response.headers.get('content-length', 0))
+				chunk_size = 2048
+
 				image_file = movie_path / config.fanart_image
 				with open(image_file, 'wb') as f:
-					for chunk in response.iter_content(chunk_size=2048):
-						f.write(chunk)
+					with tqdm(total=total_size, unit='B', unit_scale=True, desc='图片下载', leave=False, ncols=80, bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt}') as pbar:
+						for chunk in response.iter_content(chunk_size=chunk_size):
+							if chunk:
+								f.write(chunk)
+								pbar.update(len(chunk))
 
 				self.crop_image(image_file, movie_path / config.poster_image)
 				return True
 			except (RequestException, Timeout) as e:
 				if retry >= max_retries:
-					logger.error(f'网络请求失败：{str(e)}')
 					return False
 
 	def crop_image(self, src_file: Path, dest_file: Path):
@@ -509,20 +526,17 @@ class MovieScraper(object):
 			src_file: 输入图片文件路径
 			dest_file: 输出图片文件路径
 		"""
-		try:
-			with Image.open(src_file) as source_img:
-				width, height = source_img.size
+		with Image.open(src_file) as source_img:
+			width, height = source_img.size
 
-				left = width - 379
-				top = 0
-				right = width
-				bottom = height
+			left = width - 379
+			top = 0
+			right = width
+			bottom = height
 
-				cropped_img = source_img.crop((left, top, right, bottom))
-				cropped_img.save(dest_file, format='JPEG')
-				source_img.save(src_file, format='JPEG')
-		except Exception as e:
-			logger.error(f'图片裁剪失败：{str(e)}')
+			cropped_img = source_img.crop((left, top, right, bottom))
+			cropped_img.save(dest_file, format='JPEG')
+			source_img.save(src_file, format='JPEG')
 #endregion
 
 
@@ -553,7 +567,7 @@ class DVHelper(MovieScraper):
 				continue
 
 			# 排除指定名称的文件夹
-			dirnames[:] = [dir_name for dir_name in dirnames if dir_name != config.completed_path]
+			dirnames[:] = [dir_name for dir_name in dirnames if dir_name not in config.exclude_path]
 
 			for filename in filenames:
 				if any(filename.lower().endswith(ext) for ext in config.movie_file_extensions):
@@ -581,7 +595,7 @@ class DVHelper(MovieScraper):
 			keyword = Path(item).name if dir_mode else item
 
 			print()
-			logger.info(f'({index}/{len(keywords)}) 正在搜索 {keyword}...')
+			logger.info(f'[{index}/{len(keywords)}] ♻正在搜索 {keyword}...')
 
 			keyword = config.ignored_pattern.sub('', keyword)
 			match = config.movie_number_pattern.search(keyword)
@@ -589,70 +603,98 @@ class DVHelper(MovieScraper):
 			if match:
 				keyword = match.group(1).upper() # 目标网站搜索时区分大小写
 			else:
-				logger.warning(f'无法从 {keyword} 中提取影片关键词，可以尝试修改文件名后再试')
+				logger.warning(f'❌无法从 {keyword} 中提取影片关键词，可以尝试修改文件名后再试')
 				failed_movies.append(keyword)
 				continue
 
-			# 1. 搜索影片
-			response_text = self.fetch_data(f'{config.search_url}{urllib.parse.quote_plus(keyword)}')
-			search_results = MovieParser.parse_search_results(response_text, keyword)
+			tqdm_steps = 6 if dir_mode else 5
 
-			if not search_results:
-				logger.warning(f'未搜索到与 {keyword} 匹配的影片')
-				failed_movies.append(keyword)
-				continue
+			with trange(tqdm_steps, desc=f'处理 {keyword}', unit='步', leave=False, ncols=80, bar_format='{l_bar}{bar}|') as step_pbar:
+				# 1. 搜索影片
+				step_pbar.set_description(f'搜索影片')
+				response_text = self.fetch_data(f'{config.search_url}{urllib.parse.quote_plus(keyword)}')
+				search_results = MovieParser.parse_search_results(response_text, keyword)
 
-			# 2. 获取影片详情
-			logger.info('获取影片详情')
-			response_text = self.fetch_data(search_results['url'])
-			movie_details = MovieParser.parse_movie_details(response_text)
+				if not search_results:
+					logger.warning('❌未找到匹配的影片')
+					failed_movies.append(keyword)
+					continue
+				else:
+					step_pbar.update()
 
-			if not movie_details:
-				logger.warning('无法获取影片详情')
-				failed_movies.append(keyword)
-				continue
+				# 2. 获取影片详情
+				step_pbar.set_description('获取影片详情')
+				response_text = self.fetch_data(search_results['url'])
+				movie_details = MovieParser.parse_movie_details(response_text)
 
-			movie_details.update({
-				'url': search_results['url'],
-				'title': search_results['title'],
-				'image_url': search_results['image_url'],
-			})
+				if not movie_details:
+					logger.warning('❌无法获取影片详情')
+					failed_movies.append(keyword)
+					continue
+				else:
+					step_pbar.update()
 
-			movie_info = MovieInfo(movie_details)
+				# 3. 解析影片详情
+				step_pbar.set_description('解析影片详情')
+				movie_details = MovieParser.parse_movie_details(response_text)
 
-			# 3. 按演员组织目录结果并创建影片目录
-			actor_count = len(movie_info.actors)
+				if not movie_details:
+					logger.warning('❌无法解析影片详情')
+					failed_movies.append(keyword)
+					continue
+				else:
+					step_pbar.update()
 
-			if actor_count == 0:
-				dir1 = '==无名演员=='
-			elif actor_count == 1:
-				dir1 = movie_info.actors[0]
-			else:
-				dir1 = '==多演员=='
+				movie_details.update({
+					'url': search_results['url'],
+					'title': search_results['title'],
+					'image_url': search_results['image_url'],
+				})
 
-			base_dir = (Path(root_dir) if dir_mode else Path(os.getcwd())) / config.completed_path
-			movie_path = base_dir / dir1 / f'[{movie_info.number}]({movie_info.year})'
-			movie_path.mkdir(parents=True, exist_ok=True)
+				movie_info = MovieInfo(movie_details)
 
-			# 4. 下载并处理封面图片
-			logger.info('下载封面图片')
-			if not self.fetch_image(movie_path, movie_info.image_url):
-				logger.warning('封面图片下载失败')
-				failed_movies.append(keyword)
-				continue
+				# 3. 按演员组织目录结果并创建影片目录
+				step_pbar.set_description('创建目录')
+				actor_count = len(movie_info.actors)
 
-			# 5. 生成NFO文件
-			logger.info('生成 NFO 文件')
-			nfo = NFOGenerator(movie_info)
-			nfo.save(f'{movie_path}/{movie_info.number}.nfo')
+				if actor_count == 0:
+					dir1 = '==无名演员=='
+				elif actor_count == 1:
+					dir1 = movie_info.actors[0]
+				else:
+					dir1 = '==多演员=='
 
-			# 6. 移动影片源文件到整理后的文件夹并改名
-			if dir_mode:
-				old_path = Path(item)
-				new_path = movie_path / old_path.with_stem(movie_info.number).name.upper()
-				old_path.rename(new_path)
+				base_dir = (Path(root_dir) if dir_mode else Path(os.getcwd())) / config.completed_path
+				movie_path = base_dir / dir1 / f'[{movie_info.number}]({movie_info.year})'
+				movie_path.mkdir(parents=True, exist_ok=True)
+				step_pbar.update()
 
-			logger.info(f'影片信息相关文件已保存至: {movie_path}')
+				# 4. 下载并处理封面图片
+				step_pbar.set_description('下载封面图片')
+
+				if not self.fetch_image(movie_path, movie_info.image_url):
+					logger.warning('❌封面图片下载失败')
+					failed_movies.append(keyword)
+					continue
+				else:
+					step_pbar.update()
+
+				# 5. 生成NFO文件
+				step_pbar.set_description(f'生成 NFO 文件')
+				nfo = NFOGenerator(movie_info)
+				nfo.save(f'{movie_path}/{movie_info.number}.nfo')
+				step_pbar.update()
+
+				# 6. 移动影片源文件到整理后的文件夹并改名
+				if dir_mode:
+					step_pbar.set_description(f'移动文件')
+					old_path = Path(item)
+					new_path = movie_path / old_path.with_stem(movie_info.number).name.upper()
+					old_path.rename(new_path)
+
+					step_pbar.update()
+
+				logger.info(f'✔影片 {keyword} 相关文件已保存至 {movie_path}')
 
 		print()
 		logger.info(f'搜索完成，共搜索整理 {len(keywords)} 部影片，其中 {len(failed_movies)} 部影片获取信息失败')
@@ -680,6 +722,7 @@ def get_logger():
 	console_formatter = logging.Formatter('%(message)s')
 	console_handler = logging.StreamHandler(sys.stdout)
 	console_handler.setFormatter(console_formatter)
+	console_handler.stream = TqdmOut
 
 	# 添加处理器到日志器
 	logger.addHandler(file_handler)
