@@ -399,16 +399,13 @@ class MovieScraper(object):
 		"""
 		# 配置Chrome选项
 		chrome_options = Options()
-		chrome_options.add_experimental_option('excludeSwitches', ['enable-automation'])
-		chrome_options.add_experimental_option('useAutomationExtension', False)
-		chrome_options.add_argument('--log-level=3')
-		chrome_options.add_argument('--silent')
-		chrome_options.add_argument('--disable-logging')
-		chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+		chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
 
 		driver = webdriver.Chrome(options=chrome_options)
 
 		try:
+			logger.info('♻正在启动 Chrome 浏览器...')
+
 			print('在弹出的网页中完成登录操作\n'*3)
 			driver.get(config.sign_in_url)
 
@@ -437,7 +434,7 @@ class MovieScraper(object):
 				)
 		except Exception as e:
 			session = None
-			logger.error(f'❌用户登录失败：{str(e)}')
+			logger.error(f'❌用户登录失败')
 		finally:
 			time.sleep(2)
 			driver.quit()
