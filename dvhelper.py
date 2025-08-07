@@ -345,15 +345,13 @@ class MovieScraper(object):
 	}
 
 	def __init__(self):
-		self.__initialize_session()
+		self.session = None
 
-	def __initialize_session(self):
-		session = self.check_cookies()
+	def initialize_session(self):
+		self.session = self.check_cookies()
 
-		if session:
-			self.session = session
-		else:
-			logger.warning('未找到有效Cookies，将使用匿名会话')
+		if not self.session:
+			logger.warning('❌未找到有效Cookies，将使用匿名会话，或使用 -l 参数进行登录操作')
 
 	def check_cookies(self):
 		"""检查并加载Cookie，验证有效性
@@ -362,7 +360,7 @@ class MovieScraper(object):
 			有效的requests会话对象，Cookies过期或不存在则返回None
 		"""
 		if not self.COOKIE_FILE.exists():
-			logger.warning('Cookies 文件不存在')
+			logger.warning('❌Cookies 文件不存在')
 			return
 
 		session = requests.Session()
@@ -376,7 +374,8 @@ class MovieScraper(object):
 					expiry_time = datetime.fromtimestamp(cookie['expiry'])
 
 					if expiry_time < datetime.now() - timedelta(seconds=60):
-						logger.warning('当前 Cookie 已过期')
+						logger.warning('❌当前 Cookie 已过期')
+
 						return
 
 				session.cookies.set(
@@ -389,7 +388,7 @@ class MovieScraper(object):
 
 			return session
 		except Exception as e:
-			logger.error(f'Cookies 文件处理失败：{str(e)}')
+			logger.error(f'❌Cookies 文件处理失败：{str(e)}')
 			return
 
 	def perform_login(self):
@@ -438,7 +437,7 @@ class MovieScraper(object):
 				)
 		except Exception as e:
 			session = None
-			logger.error(f'用户登录失败：{str(e)}')
+			logger.error(f'❌用户登录失败：{str(e)}')
 		finally:
 			time.sleep(2)
 			driver.quit()
@@ -680,7 +679,7 @@ class DVHelper(MovieScraper):
 					step_pbar.set_description(f'移动影片文件')
 
 					old_path = Path(item)
-					new_path = movie_path / old_path.with_stem(movie_info.number).name.upper()
+					new_path = movie_path / old_path.with_stem(movie_info.number).name.lower()
 
 					if new_path.exists():
 						logger.warning(f'❌影片文件已存在，请自行比较后手动操作。源文件：{root_dir / old_path}，目标文件：{new_path}')
@@ -751,6 +750,8 @@ def main():
 		if dv_helper.perform_login() is None:
 			sys.exit(0)
 
+	dv_helper.initialize_session()
+
 	if Path(keyword_or_path).absolute().is_dir():
 		root_dir = Path(keyword_or_path)
 		found_files = dv_helper.list_video_files(root_dir, max_depth=args.depth)
@@ -758,7 +759,7 @@ def main():
 		if found_files:
 			logger.info(f'发现 {len(found_files)} 个视频文件')
 			for index, file_path in enumerate(found_files, 1):
-				print(f'    {index}.{Path(file_path).name}')
+				print(f'    {index}.{Path(file_path).relative_to(root_dir)}')
 
 			dv_helper.batch_process(found_files, dir_mode=True, root_dir=root_dir)
 		else:
