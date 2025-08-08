@@ -1,11 +1,11 @@
 [project]
 name = "dvhelper"
 version = "0.0.1"
-description = ""
+description = "An information scraper for avfans.com"
 authors = [
-    {name = "Walkline Wang",email = "walkline@gmail.com"}
+    {name = "Walkline Wang", email = "walkline@gmail.com"}
 ]
-license = "MIT"
+license = {text = "MIT"}
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
@@ -16,6 +16,18 @@ dependencies = [
     "tqdm (>=4.67.1,<5.0.0)",
     "requests (>=2.32.4,<3.0.0)",
 ]
+classifiers=[
+    'Programming Language :: Python :: 3',
+    'License :: OSI Approved :: MIT License',
+    'Operating System :: Microsoft :: Windows',
+    'Environment :: Console',
+]
+
+[project.urls]
+repository = "https://github.com/Walkline80/DV-Helper"
+
+[project.scripts]
+dvhelper = "dvhelper:main"
 
 [[tool.poetry.source]]
 name = "mirrors"
