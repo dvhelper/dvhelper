@@ -46,6 +46,7 @@ class Config:
 	# File & Path names
 	fanart_image: str = 'fanart.jpg'
 	poster_image: str = 'poster.jpg'
+	cookies_file: Path = Path(__file__).parent.joinpath('cookies.json')
 	completed_path: str = '#整理完成#'
 	exclude_path: tuple[str] = (
 		completed_path,
@@ -59,8 +60,11 @@ class Config:
 		r'Carib(beancom)?',
 		r'[^a-z\d](f?hd|lt)[^a-z\d]',
 	)
-	ignored_pattern: re.Pattern = re.compile('|'.join(ignored_keyword_pattern))
-	movie_number_pattern: re.Pattern = re.compile(r'\b([A-Z0-9]{3,6}-\d{3,7})[A-Z]*\b', re.I)
+	ignored_movie_pattern: re.Pattern  = re.compile('|'.join(ignored_keyword_pattern))
+	normal_movie_pattern: re.Pattern   = re.compile(r'([A-Z]{2,10})[-_](\d{2,5})', re.I)
+	normal_movie_pattern2: re.Pattern  = re.compile(r'([A-Z]{2,})(\d{2,5})', re.I)
+	fc2_movie_pattern: re.Pattern      = re.compile(r'FC2[^A-Z\d]{0,5}(PPV[^A-Z\d]{0,5})?(\d{5,7})', re.I)
+	_259luxu_movie_pattern: re.Pattern = re.compile(r'259LUXU-(\d+)', re.I)
 
 	# File extensions
 	movie_file_extensions: tuple[str] = (
@@ -338,19 +342,18 @@ class MovieParser(object):
 class MovieScraper(object):
 	"""影片信息抓取器，实现登录管理、数据和图片的抓取流程"""
 
-	COOKIE_FILE = Path('cookies.json')
 	REQUESTS_HEADERS = {
 		'Accept-Language': 'zh-CN,zh;q=0.9',
 		'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
 	}
 
 	def __init__(self):
-		self.session = None
+		self.__session = None
 
 	def initialize_session(self):
-		self.session = self.check_cookies()
+		self.__session = self.check_cookies()
 
-		if not self.session:
+		if not self.__session:
 			logger.warning('❌未找到有效Cookies，将使用匿名会话，或使用 -l 参数进行登录操作')
 
 	def check_cookies(self):
@@ -359,14 +362,14 @@ class MovieScraper(object):
 		Returns:
 			有效的requests会话对象，Cookies过期或不存在则返回None
 		"""
-		if not self.COOKIE_FILE.exists():
+		if not config.cookies_file.exists():
 			logger.warning('❌Cookies 文件不存在')
 			return
 
 		session = requests.Session()
 
 		try:
-			with open(self.COOKIE_FILE, 'r', encoding='utf-8') as f:
+			with open(config.cookies_file, 'r', encoding='utf-8') as f:
 				cookies: list[dict] = json.load(f)
 
 			for cookie in cookies:
@@ -416,10 +419,10 @@ class MovieScraper(object):
 
 			# 获取并保存Cookie
 			cookies = driver.get_cookies()
-			with open(self.COOKIE_FILE, 'w', encoding='utf-8') as f:
+			with open(config.cookies_file, 'w', encoding='utf-8') as f:
 				json.dump(cookies, f, ensure_ascii=False, indent=2)
 
-			logger.info(f'已保存 {len(cookies)} 个 Cookie 到 {self.COOKIE_FILE}')
+			logger.info(f'已保存 {len(cookies)} 个 Cookie 到 {config.cookies_file}')
 
 			# 创建会话并加载Cookie
 			session = requests.Session()
@@ -460,8 +463,8 @@ class MovieScraper(object):
 				print(f'第 {retry}/{max_retries} 次尝试（超时时间：{current_timeout} 秒）')
 
 			try:
-				if self.session:
-					response =  self.session.get(url=url, headers=self.REQUESTS_HEADERS, timeout=current_timeout)
+				if self.__session:
+					response =  self.__session.get(url=url, headers=self.REQUESTS_HEADERS, timeout=current_timeout)
 				else:
 					response = requests.get(url=url, headers=self.REQUESTS_HEADERS, timeout=current_timeout)
 
@@ -543,6 +546,34 @@ class DVHelper(MovieScraper):
 	def __init__(self):
 		super().__init__()
 
+	def analyze_keyword(self, keyword: str):
+		"""从已知信息中分析并提取影片ID
+
+		Args:
+			keyword: 已知的影片名称或关键词
+
+		Returns:
+			提取的影片ID，否则返回None
+		"""
+		keyword = config.ignored_movie_pattern.sub('', keyword).upper()
+
+		if 'FC2' in keyword:
+			match = config.fc2_movie_pattern.search(keyword)
+			if match:
+				return f'FC2-{match.group(2)}'
+		elif '259LUXU' in keyword:
+			match = config._259luxu_movie_pattern.search(keyword)
+			if match:
+				return f'259LUXU-{match.group(1)}'
+		else:
+			match = config.normal_movie_pattern.search(keyword)
+			if match:
+				return match.group(1) + '-' + match.group(2)
+
+			match = config.normal_movie_pattern2.search(keyword)
+			if match:
+				return match.group(1) + '-' + match.group(2)
+
 	def list_video_files(self, root_dir: Path, max_depth: int=0):
 		"""在指定目录中搜索视频文件
 
@@ -583,6 +614,7 @@ class DVHelper(MovieScraper):
 			dir_mode: 是否为目录模式，默认为False
 			root_dir: 目录模式下的根目录，默认为None
 		"""
+
 		if dir_mode:
 			assert root_dir is not None, '目录模式下必须提供根目录路径'
 
@@ -594,23 +626,20 @@ class DVHelper(MovieScraper):
 			print()
 			logger.info(f'[{index}/{len(keywords)}] ♻正在搜索 {keyword}...')
 
-			keyword = config.ignored_pattern.sub('', keyword)
-			match = config.movie_number_pattern.search(keyword)
+			movie_id = self.analyze_keyword(keyword)
 
-			if match:
-				keyword = match.group(1).upper() # 目标网站搜索时区分大小写
-			else:
-				logger.warning(f'❌无法从 {keyword} 中提取影片关键词，可以尝试修改文件名后再试')
+			if not movie_id:
+				logger.warning('❌无法提取影片ID，可以尝试修改文件名后再试')
 				failed_movies.append(keyword)
 				continue
 
 			tqdm_steps = 6 if dir_mode else 5
 
-			with trange(tqdm_steps, desc=f'处理 {keyword}', unit='步', leave=False, ncols=80, bar_format='{l_bar}{bar}|') as step_pbar:
+			with trange(tqdm_steps, desc=f'处理 {movie_id}', unit='步', leave=False, ncols=80, bar_format='{l_bar}{bar}|') as step_pbar:
 				# 1. 搜索影片
 				step_pbar.set_description(f'搜索影片')
-				response_text = self.fetch_data(f'{config.search_url}{urllib.parse.quote_plus(keyword)}')
-				search_results = MovieParser.parse_search_results(response_text, keyword)
+				response_text = self.fetch_data(f'{config.search_url}{urllib.parse.quote_plus(movie_id)}')
+				search_results = MovieParser.parse_search_results(response_text, movie_id)
 
 				if not search_results:
 					logger.warning('❌未找到匹配的影片')
@@ -685,7 +714,7 @@ class DVHelper(MovieScraper):
 					old_path.rename(new_path)
 					step_pbar.update()
 
-				logger.info(f'✔影片 {keyword} 相关文件已保存至 {movie_path}')
+				logger.info(f'✔影片相关文件已保存至：{movie_path}')
 
 		print()
 		logger.info(f'搜索完成，共搜索整理 {len(keywords)} 部影片，其中 {len(failed_movies)} 部影片获取信息失败')
@@ -693,7 +722,7 @@ class DVHelper(MovieScraper):
 		if failed_movies:
 			print('获取信息失败的影片：')
 			for index, movie in enumerate(failed_movies, 1):
-				print(f'    {index}.{movie}')
+				print(f'    {index}.{Path(movie).relative_to(root_dir) if dir_mode else movie}')
 
 
 def get_logger():
@@ -728,7 +757,7 @@ def main():
 		description=config.description,
 		usage='%(prog)s [options] keyword_or_path',
 		formatter_class=argparse.RawTextHelpFormatter,
-		epilog=config.epilog
+		# epilog=config.epilog
 	)
 
 	parser.add_argument('keyword_or_path', type=str, help=config.keyword_help)
@@ -762,7 +791,13 @@ def main():
 		else:
 			logger.info(f"在 {root_dir} {'及其子目录' if args.depth > 0 else ''}中未发现视频文件")
 	else:
-		dv_helper.batch_process([keyword.strip() for keyword in keyword_or_path.split(',')])
+		keywords = [keyword.strip() for keyword in keyword_or_path.split(',')]
+		logger.info(f'待处理 {len(keywords)} 个影片关键词')
+
+		for index, keyword in enumerate(keywords, 1):
+			print(f'    {index}.{keyword}')
+
+		dv_helper.batch_process(keywords)
 
 config = Config()
 logger = get_logger()
