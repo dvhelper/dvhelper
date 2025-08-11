@@ -23,6 +23,8 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from tqdm import tqdm, trange
+from rich_argparse import RawTextRichHelpFormatter
+
 
 # XML处理相关导入
 from xml.dom import minidom
@@ -34,6 +36,10 @@ import xml.etree.ElementTree as ET
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 #endregion
+
+
+__version__ = '0.0.1'
+__version_info__ = tuple(int(x) for x in __version__.split('.'))
 
 
 @dataclass
@@ -93,28 +99,28 @@ class Config:
 	)
 
 	# argparse help messages
-	description: str = 'DV Helper - 影片信息搜索和NFO生成工具\n\n  该工具可以自动搜索影片信息、下载封面图片、生成NFO文件，\n  并按演员分类整理您的影片收藏。支持影片搜索和批量处理本地视频。'
-	keyword_help: str = '搜索关键词（如影片编号）或本地视频文件夹路径。\n可以使用逗号分隔多个关键词，或指定一个包含视频文件的文件夹路径进行批量处理。'
-	depth_help: str = '文件夹搜索深度（默认：0，表示仅搜索当前目录）'
-	login_help: str = '强制重新登录网站，忽略已保存的Cookie'
+	description: str = f'[b]DV Helper (version [i]{__version__}[/]) - 影片信息搜索和NFO生成工具\n\n  自动搜索影片信息、下载封面图片、生成NFO文件，并按演员分类整理影片\n  支持影片搜索和本地视频批量处理[/]'
+	keywords_help: str = '搜索关键词（如影片编号）或本地视频文件夹路径\n可以使用逗号分隔多个关键词，或指定一个包含视频文件的文件夹路径进行批量处理'
+	depth_help: str = '文件夹搜索深度（默认：%(default)s，表示仅搜索当前目录）'
+	login_help: str = '忽略已保存的 Cookie 强制进行新的登录操作'
 	epilog: str = '''
-examples:
-  1.搜索影片编号：
-      %(prog)s ABCDE-123
-      搜索编号为ABCDE-123的影片信息并在当前目录下生成整理好的影片目录。
-      可以使用逗号分隔多个搜索关键词。
+[argparse.groups]Examples:[/]
+  [b]搜索影片编号[/]
+    [argparse.prog]%(prog)s[/] [argparse.args]ABCDE-123[/]
 
-  2.批量处理文件夹中的视频：
-      %(prog)s /path/to/movies
-      扫描指定文件夹中的视频文件并生成整理好的影片目录。
+    搜索编号为 [argparse.args]ABCDE-123[/] 的影片信息并在当前目录下生成整理好的影片目录
+    可以使用逗号分隔多个搜索关键词
 
-  3.深度扫描子文件夹：
-      %(prog)s /path/to/movies -d 1
-      扫描指定文件夹及其下一级子文件夹中的视频文件并生成整理好的影片目录。
+  [b]批量处理文件夹中的视频[/]
+    [argparse.prog]%(prog)s[/] [argparse.args]/path/to/movies[/] -d [argparse.metavar]1[/]
 
-  4.强制重新登录：
-      %(prog)s ABCDE-123 -l
-      忽略已保存的Cookie，强制进行新的登录操作。
+    扫描指定文件夹及其子目录中的视频文件并生成整理好的影片目录
+    使用 -d 参数可以指定子文件夹的扫描深度，否则仅扫描当前目录
+
+  [b]强制重新登录[/]
+    [argparse.prog]%(prog)s[/] [argparse.args]ABCDE-123[/] -l
+
+    忽略已保存的 Cookie，强制进行新的登录操作
 '''
 
 
@@ -630,7 +636,7 @@ class DVHelper(MovieScraper):
 
 			if not movie_id:
 				logger.warning('❌无法提取影片ID，可以尝试修改文件名后再试')
-				failed_movies.append(keyword)
+				failed_movies.append(item)
 				continue
 
 			tqdm_steps = 6 if dir_mode else 5
@@ -643,7 +649,7 @@ class DVHelper(MovieScraper):
 
 				if not search_results:
 					logger.warning('❌未找到匹配的影片')
-					failed_movies.append(keyword)
+					failed_movies.append(item)
 					continue
 
 				step_pbar.update()
@@ -655,7 +661,7 @@ class DVHelper(MovieScraper):
 
 				if not movie_details:
 					logger.warning('❌无法获取影片详情')
-					failed_movies.append(keyword)
+					failed_movies.append(item)
 					continue
 
 				step_pbar.update()
@@ -689,7 +695,7 @@ class DVHelper(MovieScraper):
 
 				if not self.fetch_image(movie_path, movie_info.image_url):
 					logger.warning('❌封面图片下载失败')
-					failed_movies.append(keyword)
+					failed_movies.append(item)
 					continue
 
 				step_pbar.update()
@@ -705,7 +711,8 @@ class DVHelper(MovieScraper):
 					step_pbar.set_description(f'移动影片文件')
 
 					old_path = Path(item)
-					new_path = movie_path / old_path.with_stem(movie_info.number).name.lower()
+					new_path = movie_path / old_path.with_stem(movie_info.number.upper())\
+													.with_suffix(old_path.suffix.lower()).name
 
 					if new_path.exists():
 						logger.warning(f'❌影片文件已存在，请自行比较后手动操作。源文件：{root_dir / old_path}，目标文件：{new_path}')
@@ -755,12 +762,13 @@ def main():
 
 	parser = HelpOnErrorParser(
 		description=config.description,
-		usage='%(prog)s [options] keyword_or_path',
-		formatter_class=argparse.RawTextHelpFormatter,
+		usage='%(prog)s [options] keywords_or_path',
+		formatter_class=RawTextRichHelpFormatter,
 		# epilog=config.epilog
 	)
 
-	parser.add_argument('keyword_or_path', type=str, help=config.keyword_help)
+	parser.add_argument('-v', '--version', action='version', version=f'[argparse.prog]DV Helper[/] (version [i]{__version__}[/])')
+	parser.add_argument('keywords_or_path', type=str, help=config.keywords_help)
 	parser.add_argument('-d', '--depth', type=int, default=0, help=config.depth_help)
 	parser.add_argument('-l', '--login', action='store_true', help=config.login_help)
 
@@ -770,7 +778,7 @@ def main():
 
 	dv_helper = DVHelper()
 	args = parser.parse_args()
-	keyword_or_path: str = args.keyword_or_path
+	keywords_or_path: str = args.keywords_or_path
 
 	if args.login:
 		if dv_helper.perform_login() is None:
@@ -778,8 +786,8 @@ def main():
 
 	dv_helper.initialize_session()
 
-	if Path(keyword_or_path).absolute().is_dir():
-		root_dir = Path(keyword_or_path)
+	if Path(keywords_or_path).absolute().is_dir():
+		root_dir = Path(keywords_or_path)
 		found_files = dv_helper.list_video_files(root_dir, max_depth=args.depth)
 
 		if found_files:
@@ -791,7 +799,7 @@ def main():
 		else:
 			logger.info(f"在 {root_dir} {'及其子目录' if args.depth > 0 else ''}中未发现视频文件")
 	else:
-		keywords = [keyword.strip() for keyword in keyword_or_path.split(',')]
+		keywords = [keyword.strip() for keyword in keywords_or_path.split(',')]
 		logger.info(f'待处理 {len(keywords)} 个影片关键词')
 
 		for index, keyword in enumerate(keywords, 1):
