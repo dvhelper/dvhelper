@@ -14,17 +14,8 @@ from dataclasses import dataclass
 import logging
 
 # 第三方库导入
-from bs4 import BeautifulSoup
-import requests
-from requests.exceptions import RequestException, Timeout
-from selenium import webdriver
-from PIL import Image
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.options import Options
-from tqdm import tqdm, trange
 from rich_argparse import RawTextRichHelpFormatter
-
+# 其它第三方库由lazy_import()导入
 
 # XML处理相关导入
 from xml.dom import minidom
@@ -38,7 +29,7 @@ sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 #endregion
 
 
-__version__ = '0.0.1'
+__version__ = '0.0.2'
 __version_info__ = tuple(int(x) for x in __version__.split('.'))
 
 
@@ -120,7 +111,7 @@ class Config:
   [b]强制重新登录[/]
     [argparse.prog]%(prog)s[/] [argparse.args]ABCDE-123[/] -l
 
-    忽略已保存的 Cookie，强制进行新的登录操作
+    强制重新登录，忽略已保存的 Cookie 并进行新的登录操作
 '''
 
 
@@ -167,8 +158,8 @@ class MovieInfo(object):
 		self.title: str = info.get('title', '')
 		self.year: str = info.get('year', '')
 		self.runtime: str = info.get('runtime', '')
-		self.tags: List[str] = info.get('tags', [])
-		self.actors: List[str] = info.get('actors', [])
+		self.tags: list[str] = info.get('tags', [])
+		self.actors: list[str] = info.get('actors', [])
 		self.director: str = info.get('director', '')
 		self.studio: str = info.get('studio', '')
 		self.publisher: str = info.get('publisher', '')
@@ -462,6 +453,7 @@ class MovieScraper(object):
 		Returns:
 			响应内容文本，所有重试失败则返回None
 		"""
+
 		for retry in range(1, max_retries + 1):
 			current_timeout = initial_timeout * (backoff_factor ** (retry - 1))
 
@@ -732,6 +724,22 @@ class DVHelper(MovieScraper):
 				print(f'    {index}.{Path(movie).relative_to(root_dir) if dir_mode else movie}')
 
 
+def lazy_import():
+	global requests, RequestException, Timeout
+	global BeautifulSoup, Image
+	global webdriver, WebDriverWait, EC, Options
+	global tqdm, trange
+
+	import requests
+	from requests.exceptions import RequestException, Timeout
+	from bs4 import BeautifulSoup
+	from PIL import Image
+	from selenium import webdriver
+	from selenium.webdriver.support.ui import WebDriverWait
+	from selenium.webdriver.support import expected_conditions as EC
+	from selenium.webdriver.chrome.options import Options
+	from tqdm import tqdm, trange
+
 def get_logger():
 	logger = logging.getLogger(__name__)
 	logger.setLevel(logging.INFO)
@@ -760,6 +768,10 @@ def get_logger():
 def main():
 	"""应用程序入口点"""
 
+	global config, logger
+	config = Config()
+	logger = get_logger()
+
 	parser = HelpOnErrorParser(
 		description=config.description,
 		usage='%(prog)s [options] keywords_or_path',
@@ -775,6 +787,8 @@ def main():
 	if len(sys.argv) == 1:
 		parser.print_help()
 		sys.exit(0)
+
+	lazy_import()
 
 	dv_helper = DVHelper()
 	args = parser.parse_args()
@@ -806,9 +820,6 @@ def main():
 			print(f'    {index}.{keyword}')
 
 		dv_helper.batch_process(keywords)
-
-config = Config()
-logger = get_logger()
 
 
 if __name__ == '__main__':
