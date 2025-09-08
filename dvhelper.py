@@ -36,20 +36,21 @@ __version_info__ = tuple(int(x) for x in __version__.split('.'))
 @dataclass
 class Config:
 	# URLs
-	base_url: str = 'https://avfan.com'
+	base_url:    str = 'https://avfan.com'
 	sign_in_url: str = f'{base_url}/zh-CN/sign_in'
-	search_url: str = f'{base_url}/search?q='
+	search_url:  str = f'{base_url}/search?q='
 
-	# File & Path names
-	fanart_image: str = 'fanart.jpg'
-	poster_image: str = 'poster.jpg'
-	cookies_file: Path = Path(__file__).parent.joinpath('cookies.json')
+	#region File & Path names
+	fanart_image: str   = 'fanart.jpg'
+	poster_image: str   = 'poster.jpg'
+	cookies_file: Path  = Path(__file__).parent.joinpath('cookies.json')
 	completed_path: str = '#整理完成#'
 	exclude_path: tuple[str] = (
 		completed_path,
 	)
+	#endregion
 
-	# Regex pattern
+	#region Regex pattern
 	ignored_keyword_pattern: list[str] = (
 		r'(144|240|360|480|720|1080)[Pp]',
 		r'[24][Kk]',
@@ -62,17 +63,19 @@ class Config:
 	normal_movie_pattern2: re.Pattern  = re.compile(r'([A-Z]{2,})(\d{2,5})', re.I)
 	fc2_movie_pattern: re.Pattern      = re.compile(r'FC2[^A-Z\d]{0,5}(PPV[^A-Z\d]{0,5})?(\d{5,7})', re.I)
 	_259luxu_movie_pattern: re.Pattern = re.compile(r'259LUXU-(\d+)', re.I)
+	#endregion
 
 	# File extensions
 	movie_file_extensions: tuple[str] = (
 		'.3gp', '.avi', '.f4v', '.flv', '.iso', '.m2ts',
 		'.m4v', '.mkv', '.mov', '.mp4', '.mpeg', '.rm',
-		'.rmvb', '.ts', '.vob', '.webm', '.wmv', '.strm', '.mpg'
+		'.rmvb', '.ts', '.vob', '.webm', '.wmv', '.strm',
+		'.mpg',
 	)
 
 	# CSS selectors
 	search_target_class: str = 'flex flex-col relative hover:bg-zinc-100 hover:dark:bg-zinc-800'
-	movie_target_class: str = 'flex flex-col gap-2'
+	movie_target_class:  str = 'flex flex-col gap-2'
 
 	# Exclude actors
 	exclude_actors: tuple[str] = (
@@ -86,15 +89,15 @@ class Config:
 		'タツ', 'テツ神山', '瀧口', '左曲かおる', '杉浦ボッ樹', 'ウルフ田中', 'ゆうき', 'ピエール剣', '一馬', '--',
 		'桐島達也', '七尾神', 'フランクフルト林', 'ナルシス小林', 'カルロス', 'たむらあゆむ', '橋本誠吾', '羽田貴史',
 		'森林原人', 'およよ中野', 'ひょこり', '堀尾', 'しめじ', '太刀茜祢', '黒井ゆう', 'マサムー', 'レンジャー鏑木',
-		'ドピュー',
+		'ドピュー', '佐川銀次',
 	)
 
-	# argparse help messages
-	description: str = f'[b]DV Helper (version [i]{__version__}[/]) - 影片信息搜索和NFO生成工具\n\n  自动搜索影片信息、下载封面图片、生成NFO文件，并按演员分类整理影片\n  支持影片搜索和本地视频批量处理[/]'
+	#region argparse help messages
+	description:   str = f'[b]DV Helper (version [i]{__version__}[/]) - 影片信息搜索和NFO生成工具\n\n  自动搜索影片信息、下载封面图片、生成NFO文件，并按演员分类整理影片\n  支持影片搜索和本地视频批量处理[/]'
 	keywords_help: str = '搜索关键词（如影片编号）或本地视频文件夹路径\n可以使用逗号分隔多个关键词，或指定一个包含视频文件的文件夹路径进行批量处理'
-	depth_help: str = '文件夹搜索深度（默认：%(default)s，表示仅搜索当前目录）'
-	login_help: str = '忽略已保存的 Cookie 强制进行新的登录操作'
-	epilog: str = '''
+	depth_help:    str = '文件夹搜索深度（默认：%(default)s，表示仅搜索当前目录）'
+	login_help:    str = '忽略已保存的 Cookie 强制进行新的登录操作'
+	epilog:        str = '''
 [argparse.groups]Examples:[/]
   [b]搜索影片编号[/]
     [argparse.prog]%(prog)s[/] [argparse.args]ABCDE-123[/]
@@ -113,6 +116,7 @@ class Config:
 
     强制重新登录，忽略已保存的 Cookie 并进行新的登录操作
 '''
+	#endregion
 
 
 #region Base Classes
