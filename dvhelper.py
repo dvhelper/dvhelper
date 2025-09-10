@@ -29,7 +29,7 @@ sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 #endregion
 
 
-__version__ = '0.0.2'
+__version__ = '0.0.3'
 __version_info__ = tuple(int(x) for x in __version__.split('.'))
 
 
@@ -41,9 +41,9 @@ class Config:
 	search_url:  str = f'{base_url}/search?q='
 
 	#region File & Path names
-	fanart_image: str   = 'fanart.jpg'
-	poster_image: str   = 'poster.jpg'
-	cookies_file: Path  = Path(__file__).parent.joinpath('cookies.json')
+	fanart_image:   str = 'fanart.jpg'
+	poster_image:   str = 'poster.jpg'
+	cookies_file:  Path = Path(__file__).parent.joinpath('cookies.json')
 	completed_path: str = '#整理完成#'
 	exclude_path: tuple[str] = (
 		completed_path,
@@ -58,10 +58,10 @@ class Config:
 		r'Carib(beancom)?',
 		r'[^a-z\d](f?hd|lt)[^a-z\d]',
 	)
-	ignored_movie_pattern: re.Pattern  = re.compile('|'.join(ignored_keyword_pattern))
-	normal_movie_pattern: re.Pattern   = re.compile(r'([A-Z]{2,10})[-_](\d{2,5})', re.I)
-	normal_movie_pattern2: re.Pattern  = re.compile(r'([A-Z]{2,})(\d{2,5})', re.I)
-	fc2_movie_pattern: re.Pattern      = re.compile(r'FC2[^A-Z\d]{0,5}(PPV[^A-Z\d]{0,5})?(\d{5,7})', re.I)
+	ignored_movie_pattern:  re.Pattern = re.compile('|'.join(ignored_keyword_pattern))
+	normal_movie_pattern:   re.Pattern = re.compile(r'([A-Z]{2,10})[-_](\d{2,5})', re.I)
+	normal_movie_pattern2:  re.Pattern = re.compile(r'([A-Z]{2,})(\d{2,5})', re.I)
+	fc2_movie_pattern:      re.Pattern = re.compile(r'FC2[^A-Z\d]{0,5}(PPV[^A-Z\d]{0,5})?(\d{5,7})', re.I)
 	_259luxu_movie_pattern: re.Pattern = re.compile(r'259LUXU-(\d+)', re.I)
 	#endregion
 
@@ -89,7 +89,7 @@ class Config:
 		'タツ', 'テツ神山', '瀧口', '左曲かおる', '杉浦ボッ樹', 'ウルフ田中', 'ゆうき', 'ピエール剣', '一馬', '--',
 		'桐島達也', '七尾神', 'フランクフルト林', 'ナルシス小林', 'カルロス', 'たむらあゆむ', '橋本誠吾', '羽田貴史',
 		'森林原人', 'およよ中野', 'ひょこり', '堀尾', 'しめじ', '太刀茜祢', '黒井ゆう', 'マサムー', 'レンジャー鏑木',
-		'ドピュー', '佐川銀次',
+		'ドピュー', '佐川銀次', '渋谷優太',
 	)
 
 	#region argparse help messages
@@ -97,6 +97,7 @@ class Config:
 	keywords_help: str = '搜索关键词（如影片编号）或本地视频文件夹路径\n可以使用逗号分隔多个关键词，或指定一个包含视频文件的文件夹路径进行批量处理'
 	depth_help:    str = '文件夹搜索深度（默认：%(default)s，表示仅搜索当前目录）'
 	login_help:    str = '忽略已保存的 Cookie 强制进行新的登录操作'
+	gallery_help:  str = '下载影片的剧照和预告片'
 	epilog:        str = '''
 [argparse.groups]Examples:[/]
   [b]搜索影片编号[/]
@@ -138,38 +139,42 @@ class MovieInfo(object):
 	"""影片信息数据类，统一管理影片相关信息
 	
 	Attributes:
-		url: 影片详情页URL
-		image_url: 封面图片URL
-		number: 影片编号
-		title: 影片标题
-		year: 发行年份
-		runtime: 影片时长(分钟)
-		tags: 标签列表
-		actors: 演员列表
-		director: 导演
-		studio: 制作商
-		publisher: 发行商
-		premiered: 发行日期
-		mpaa: 分级
-		country: 国家/地区
+		detail_url : 影片详情页URL
+		fanart_url : 封面图片URL
+		number     : 影片编号
+		trailer_url: 预告片URL
+		galleries  : 剧照URL列表
+		title      : 影片标题
+		year       : 发行年份
+		runtime    : 影片时长(分钟)
+		tags       : 标签列表
+		actors     : 演员列表
+		director   : 导演
+		studio     : 制作商
+		publisher  : 发行商
+		premiered  : 发行日期
+		mpaa       : 分级
+		country    : 国家/地区
 	"""
 
 	def __init__(self, info: dict):
 		self.info = info
-		self.url: str = info.get('url', '')
-		self.image_url: str = info.get('image_url', '')
-		self.number: str = info.get('number', '')
-		self.title: str = info.get('title', '')
-		self.year: str = info.get('year', '')
-		self.runtime: str = info.get('runtime', '')
-		self.tags: list[str] = info.get('tags', [])
-		self.actors: list[str] = info.get('actors', [])
-		self.director: str = info.get('director', '')
-		self.studio: str = info.get('studio', '')
-		self.publisher: str = info.get('publisher', '')
-		self.premiered: str = info.get('premiered', '')
-		self.mpaa: str = info.get('mpaa', 'NC-17')
-		self.country: str = info.get('country', '日本')
+		self.detail_url:      str = info.get('detail_url', '')
+		self.fanart_url:      str = info.get('fanart_url', '')
+		self.trailer_url:     str = info.get('trailer_url', '')
+		self.galleries: list[str] = info.get('galleries', [])
+		self.number:          str = info.get('number', '')
+		self.title:           str = info.get('title', '')
+		self.year:            str = info.get('year', '')
+		self.runtime:         str = info.get('runtime', '')
+		self.tags:      list[str] = info.get('tags', [])
+		self.actors:    list[str] = info.get('actors', [])
+		self.director:        str = info.get('director', '')
+		self.studio:          str = info.get('studio', '')
+		self.publisher:       str = info.get('publisher', '')
+		self.premiered:       str = info.get('premiered', '')
+		self.mpaa:            str = info.get('mpaa', 'NC-17')
+		self.country:         str = info.get('country', '日本')
 
 
 class NFOGenerator(object):
@@ -193,8 +198,8 @@ class NFOGenerator(object):
 
 		# 影片编号作为唯一标识
 		if movie_info.number:
-			uniqueid = ET.SubElement(self.root, 'uniqueid')
-			uniqueid.text = movie_info.number
+			uniqueid        = ET.SubElement(self.root, 'uniqueid')
+			uniqueid.text   = movie_info.number
 			uniqueid.attrib = {'type': 'num', 'default': 'true'}
 
 		# 分类和标签
@@ -208,7 +213,7 @@ class NFOGenerator(object):
 		ET.SubElement(self.root, 'country').text = movie_info.country
 
 		if movie_info.director:
-			ET.SubElement(self.root, 'director').text = movie_info.director
+			ET.SubElement(self.root, 'director').text  = movie_info.director
 		if movie_info.premiered:
 			ET.SubElement(self.root, 'premiered').text = movie_info.premiered
 		if movie_info.studio:
@@ -222,6 +227,13 @@ class NFOGenerator(object):
 				actor = ET.SubElement(self.root, 'actor')
 				ET.SubElement(actor, 'name').text = actor_info
 
+		# 媒体信息
+		if movie_info.fanart_url:
+			fanart = ET.SubElement(self.root, 'fanart')
+			ET.SubElement(fanart, 'thumb').text      = movie_info.fanart_url
+		if movie_info.trailer_url:
+			ET.SubElement(self.root, 'trailer').text = movie_info.trailer_url
+
 	def save(self, output_path: Path):
 		"""将XML结构保存为格式化的NFO文件
 
@@ -231,7 +243,9 @@ class NFOGenerator(object):
 		# 生成格式化的XML字符串
 		rough_string = ET.tostring(self.root, 'utf-8')
 		reparsed = minidom.parseString(rough_string)
-		pretty_xml = reparsed.toprettyxml(indent='    ', encoding='utf-8', standalone=True)
+		pretty_xml = reparsed.toprettyxml(
+			indent='    ', encoding='utf-8', standalone=True
+		).replace(b'&amp;', b'&')
 
 		with open(output_path, 'wb') as f:
 			f.write(pretty_xml)
@@ -263,16 +277,16 @@ class MovieParser(object):
 			if not a_tag:
 				continue
 
-			href: str = a_tag.get('href')
-			title: str = a_tag.get('title').strip()
-			img_tag = a_tag.find('img')
-			img_src: str = img_tag.get('src')
+			href: str    = a_tag.get('href', '')
+			title: str   = a_tag.get('title', '').strip()
+			img_tag      = a_tag.find('img')
+			img_src: str = img_tag.get('src', '')
 
 			if keyword.lower() in title.lower():
 				return {
-					'url': f'{config.base_url}{href}',
-					'title': title,
-					'image_url': img_src
+					'detail_url': f'{config.base_url}{href}',
+					'title'     : title,
+					'fanart_url': img_src
 				}
 		return
 
@@ -294,12 +308,26 @@ class MovieParser(object):
 		soup = BeautifulSoup(html, 'html.parser')
 		ul_elements = soup.find_all('ul', class_=config.movie_target_class)
 
+		# 提取影片详情
 		for ul_element in ul_elements:
 			li_elements = ul_element.find_all('li')
 
 			if li_elements:
 				li_contents = [li.get_text(strip=True) for li in li_elements]
 				results = MovieParser.__extract_info_from_list(li_contents)
+
+		results['galleries'] = []
+		a_elements = soup.find_all('a', {'data-fancybox': 'gallery'})
+
+		# 提取预告片和剧照
+		for a_tag in a_elements:
+			href: str = a_tag.get('href', '')
+			data_caption: str = a_tag.get('data-caption', '').strip()
+
+			if data_caption == '预告片':
+				results['trailer_url'] = href
+			else:
+				results['galleries'].append(href)
 
 		return results
 
@@ -320,7 +348,6 @@ class MovieParser(object):
 				result['number'] = item.replace('番号:', '').replace('复制', '').strip()
 			elif item.startswith('发行日期:'):
 				result['premiered'] = item.replace('发行日期:', '').strip()
-
 				if len(result['premiered']) >= 4:
 					result['year'] = result['premiered'][:4]
 			elif item.startswith('片长:'):
@@ -478,14 +505,16 @@ class MovieScraper(object):
 				if retry >= max_retries:
 					return
 
-	def fetch_image(self, movie_path: Path, url: str, max_retries=3, initial_timeout=30, backoff_factor=2):
-		"""下载影片封面图片并进行裁剪
+	def fetch_media(self, movie_path: Path, media_file: str, url: str, crop: bool=False, max_retries=3, initial_timeout=30, backoff_factor=2):
+		"""下载影片相关媒体文件（包含影片封面图片、剧照、预告片等）
 
-		从指定地址下载影片封面图片，支持重试机制，并显示下载进度
+		从指定地址下载影片媒体文件，支持重试机制，并显示下载进度
 
 		Args:
-			movie_path: 封面图片保存路径
-			url: 封面图片下载地址
+			movie_path: 媒体文件保存路径
+			media_file: 媒体文件名
+			url: 媒体文件下载地址
+			crop: 是否裁剪图片，默认False
 			max_retries: 最大重试次数，默认3次
 			initial_timeout: 初始超时时间（秒），默认30秒
 			backoff_factor: 退避因子，用于指数退避算法，默认2
@@ -505,17 +534,19 @@ class MovieScraper(object):
 
 				# 获取文件大小
 				total_size = int(response.headers.get('content-length', 0))
-				chunk_size = 2048
+				chunk_size = 8192
 
-				image_file = movie_path / config.fanart_image
-				with open(image_file, 'wb') as f:
-					with tqdm(total=total_size, unit='B', unit_scale=True, desc='图片下载', leave=False, ncols=80, bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt}') as pbar:
+				media_file = movie_path / media_file
+				with open(media_file, 'wb') as f:
+					with tqdm(total=total_size, unit='B', unit_scale=True, desc=f'媒体文件下载：{media_file.name}', leave=False, ncols=80, bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt}') as pbar:
 						for chunk in response.iter_content(chunk_size=chunk_size):
 							if chunk:
 								f.write(chunk)
 								pbar.update(len(chunk))
 
-				self.crop_image(image_file, movie_path / config.poster_image)
+				if crop:
+					self.crop_image(media_file, movie_path / config.poster_image)
+
 				return True
 			except (RequestException, Timeout) as e:
 				if retry >= max_retries:
@@ -605,14 +636,15 @@ class DVHelper(MovieScraper):
 
 		return found_files
 
-	def batch_process(self, keywords: list[str], *, dir_mode: bool=False, root_dir: Path=None):
+	def batch_process(self, keywords: list[str], *, gallery: bool=False, dir_mode: bool=False, root_dir: Path=None):
 		"""处理影片的信息搜索与整理
 
 		根据关键词列表或目录路径批量处理影片文件，包括搜索影片信息、下载封面图片、
-		生成 NFO 文件并按演员分类整理文件结构
+		剧照、预告片、生成 NFO 文件并按演员分类整理文件结构
 
 		Args:
 			keywords: 搜索关键词列表或文件路径列表
+			gallery: 是否下载剧照和预告片，默认为False
 			dir_mode: 是否为目录模式，默认为False
 			root_dir: 目录模式下的根目录，默认为None
 		"""
@@ -626,7 +658,7 @@ class DVHelper(MovieScraper):
 			keyword = Path(item).name if dir_mode else item
 
 			print()
-			logger.info(f'[{index}/{len(keywords)}] ♻正在搜索 {keyword}...')
+			logger.info(f'[{index}/{len(keywords)}] ♻ 正在搜索 {keyword}...')
 
 			movie_id = self.analyze_keyword(keyword)
 
@@ -652,7 +684,7 @@ class DVHelper(MovieScraper):
 
 				# 2. 获取影片详情
 				step_pbar.set_description('获取影片详情')
-				response_text = self.fetch_data(search_results['url'])
+				response_text = self.fetch_data(search_results['detail_url'])
 				movie_details = MovieParser.parse_movie_details(response_text)
 
 				if not movie_details:
@@ -663,9 +695,9 @@ class DVHelper(MovieScraper):
 				step_pbar.update()
 
 				movie_details.update({
-					'url': search_results['url'],
-					'title': search_results['title'],
-					'image_url': search_results['image_url'],
+					'detail_url': search_results['detail_url'],
+					'title'     : search_results['title'],
+					'fanart_url': search_results['fanart_url'],
 				})
 
 				movie_info = MovieInfo(movie_details)
@@ -687,12 +719,25 @@ class DVHelper(MovieScraper):
 				step_pbar.update()
 
 				# 4. 下载并处理封面图片
-				step_pbar.set_description('下载封面图片')
+				step_pbar.set_description('下载封面图片' + '和剧照' if gallery and movie_info.galleries else '')
 
-				if not self.fetch_image(movie_path, movie_info.image_url):
+				if not self.fetch_media(movie_path, config.fanart_image, movie_info.fanart_url, crop=True):
 					logger.warning('❌封面图片下载失败')
 					failed_movies.append(item)
 					continue
+
+				# 下载剧照
+				if gallery and movie_info.galleries:
+					for i, gallery_url in enumerate(movie_info.galleries):
+						_, ext = os.path.splitext(gallery_url.split('?')[0])
+						ext = ext.lower() if ext else '.jpg'
+						self.fetch_media(movie_path, f'gallery_{i:02d}{ext}', gallery_url)
+
+				# 下载预告片
+				if gallery and movie_info.trailer_url:
+					_, ext = os.path.splitext(movie_info.trailer_url.split('?')[0])
+					ext = ext.lower() if ext else '.mp4'
+					self.fetch_media(movie_path, f'{movie_info.number}_trailer{ext}', movie_info.trailer_url)
 
 				step_pbar.update()
 
@@ -717,7 +762,7 @@ class DVHelper(MovieScraper):
 					old_path.rename(new_path)
 					step_pbar.update()
 
-				logger.info(f'✔影片相关文件已保存至：{movie_path}')
+				logger.info(f'✔ 影片相关文件已保存至：{movie_path}')
 
 		print()
 		logger.info(f'搜索完成，共搜索整理 {len(keywords)} 部影片，其中 {len(failed_movies)} 部影片获取信息失败')
@@ -786,6 +831,7 @@ def main():
 	parser.add_argument('-v', '--version', action='version', version=f'[argparse.prog]DV Helper[/] (version [i]{__version__}[/])')
 	parser.add_argument('keywords_or_path', type=str, help=config.keywords_help)
 	parser.add_argument('-d', '--depth', type=int, default=0, help=config.depth_help)
+	parser.add_argument('-g', '--gallery', action='store_true', help=config.gallery_help)
 	parser.add_argument('-l', '--login', action='store_true', help=config.login_help)
 
 	if len(sys.argv) == 1:
@@ -813,7 +859,7 @@ def main():
 			for index, file_path in enumerate(found_files, 1):
 				print(f'    {index}.{Path(file_path).relative_to(root_dir)}')
 
-			dv_helper.batch_process(found_files, dir_mode=True, root_dir=root_dir)
+			dv_helper.batch_process(found_files, gallery=args.gallery, dir_mode=True, root_dir=root_dir)
 		else:
 			logger.info(f"在 {root_dir} {'及其子目录' if args.depth > 0 else ''}中未发现视频文件")
 	else:
@@ -823,7 +869,7 @@ def main():
 		for index, keyword in enumerate(keywords, 1):
 			print(f'    {index}.{keyword}')
 
-		dv_helper.batch_process(keywords)
+		dv_helper.batch_process(keywords, gallery=args.gallery)
 
 
 if __name__ == '__main__':
