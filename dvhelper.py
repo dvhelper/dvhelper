@@ -11,7 +11,6 @@ from pathlib import Path
 import urllib.parse
 from datetime import datetime, timedelta
 from dataclasses import dataclass
-import logging
 
 # 第三方库导入
 from rich_argparse import RawTextRichHelpFormatter
@@ -538,7 +537,7 @@ class MovieScraper(object):
 
 				media_file = movie_path / media_file
 				with open(media_file, 'wb') as f:
-					with tqdm(total=total_size, unit='B', unit_scale=True, desc=f'媒体文件下载：{media_file.name}', leave=False, ncols=80, bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt}') as pbar:
+					with tqdm(total=total_size, unit='B', unit_scale=True, desc=f'媒体文件：{media_file.name}', leave=False, ncols=80, bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt}') as pbar:
 						for chunk in response.iter_content(chunk_size=chunk_size):
 							if chunk:
 								f.write(chunk)
@@ -774,6 +773,7 @@ class DVHelper(MovieScraper):
 
 
 def lazy_import():
+	global logger
 	global requests, RequestException, Timeout
 	global BeautifulSoup, Image
 	global webdriver, WebDriverWait, EC, Options
@@ -789,7 +789,11 @@ def lazy_import():
 	from selenium.webdriver.chrome.options import Options
 	from tqdm import tqdm, trange
 
+	logger = get_logger()
+
 def get_logger():
+	import logging
+
 	logger = logging.getLogger(__name__)
 	logger.setLevel(logging.INFO)
 
@@ -817,9 +821,8 @@ def get_logger():
 def main():
 	"""应用程序入口点"""
 
-	global config, logger
+	global config
 	config = Config()
-	logger = get_logger()
 
 	parser = HelpOnErrorParser(
 		description=config.description,
