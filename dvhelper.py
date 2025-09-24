@@ -28,7 +28,7 @@ sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 #endregion
 
 
-__version__ = '0.0.3'
+__version__ = '0.0.4'
 __version_info__ = tuple(int(x) for x in __version__.split('.'))
 
 
@@ -40,10 +40,11 @@ class Config:
 	search_url:  str = f'{base_url}/search?q='
 
 	#region File & Path names
-	fanart_image:   str = 'fanart.jpg'
-	poster_image:   str = 'poster.jpg'
-	cookies_file:  Path = Path(__file__).parent.joinpath('cookies.json')
-	completed_path: str = '#整理完成#'
+	fanart_image:        str = 'fanart.jpg'
+	poster_image:        str = 'poster.jpg'
+	cookies_file:       Path = Path(__file__).parent.joinpath('cookies.json')
+	completed_path:      str = '#整理完成#'
+	ignored_file_prefix: str = '##'
 	exclude_path: tuple[str] = (
 		completed_path,
 	)
@@ -62,6 +63,8 @@ class Config:
 	normal_movie_pattern2:  re.Pattern = re.compile(r'([A-Z]{2,})(\d{2,5})', re.I)
 	fc2_movie_pattern:      re.Pattern = re.compile(r'FC2[^A-Z\d]{0,5}(PPV[^A-Z\d]{0,5})?(\d{5,7})', re.I)
 	_259luxu_movie_pattern: re.Pattern = re.compile(r'259LUXU-(\d+)', re.I)
+	_200gana_movie_pattern: re.Pattern = re.compile(r'200GANA-(\d+)', re.I)
+	_300mium_movie_pattern: re.Pattern = re.compile(r'300MIUM-(\d+)', re.I)
 	#endregion
 
 	# File extensions
@@ -597,6 +600,14 @@ class DVHelper(MovieScraper):
 			match = config._259luxu_movie_pattern.search(keyword)
 			if match:
 				return f'259LUXU-{match.group(1)}'
+		elif '200GANA' in keyword:
+			match = config._200gana_movie_pattern.search(keyword)
+			if match:
+				return f'200GANA-{match.group(1)}'
+		elif '300MIUM' in keyword:
+			match = config._300mium_movie_pattern.search(keyword)
+			if match:
+				return f'300MIUM-{match.group(1)}'
 		else:
 			match = config.normal_movie_pattern.search(keyword)
 			if match:
@@ -630,6 +641,9 @@ class DVHelper(MovieScraper):
 			dirnames[:] = [dir_name for dir_name in dirnames if dir_name not in config.exclude_path]
 
 			for filename in filenames:
+				if filename.startswith(config.ignored_file_prefix):
+					continue
+
 				if any(filename.lower().endswith(ext) for ext in config.movie_file_extensions):
 					found_files.append(Path(dirpath) / filename)
 
@@ -651,7 +665,8 @@ class DVHelper(MovieScraper):
 		if dir_mode:
 			assert root_dir is not None, '目录模式下必须提供根目录路径'
 
-		failed_movies = []
+		failed_movies  = []
+		ignored_movies = []
 
 		for index, item in enumerate(keywords, 1):
 			keyword = Path(item).name if dir_mode else item
@@ -668,8 +683,9 @@ class DVHelper(MovieScraper):
 
 			tqdm_steps = 6 if dir_mode else 5
 
-			with trange(tqdm_steps, desc=f'处理 {movie_id}', unit='步', leave=False, ncols=80, bar_format='{l_bar}{bar}|') as step_pbar:
-				# 1. 搜索影片
+			with trange(tqdm_steps, desc=f'处理 {movie_id}', unit='步',
+						leave=False, ncols=80, bar_format='{l_bar}{bar}|') as step_pbar:
+				#region 1. 搜索影片
 				step_pbar.set_description(f'搜索影片')
 				response_text = self.fetch_data(f'{config.search_url}{urllib.parse.quote_plus(movie_id)}')
 				search_results = MovieParser.parse_search_results(response_text, movie_id)
@@ -680,8 +696,9 @@ class DVHelper(MovieScraper):
 					continue
 
 				step_pbar.update()
+				#endregion
 
-				# 2. 获取影片详情
+				#region 2. 获取影片详情
 				step_pbar.set_description('获取影片详情')
 				response_text = self.fetch_data(search_results['detail_url'])
 				movie_details = MovieParser.parse_movie_details(response_text)
@@ -700,8 +717,9 @@ class DVHelper(MovieScraper):
 				})
 
 				movie_info = MovieInfo(movie_details)
+				#endregion
 
-				# 3. 按演员组织目录结果并创建影片目录
+				#region 3. 按演员组织目录结果并创建影片目录
 				step_pbar.set_description('创建影片目录')
 				actor_count = len(movie_info.actors)
 
@@ -716,8 +734,9 @@ class DVHelper(MovieScraper):
 				movie_path = base_dir / dir1 / f'[{movie_info.number}]({movie_info.year})'
 				movie_path.mkdir(parents=True, exist_ok=True)
 				step_pbar.update()
+				#endregion
 
-				# 4. 下载并处理封面图片
+				#region 4. 下载并处理封面图片
 				step_pbar.set_description('下载封面图片' + '和剧照' if gallery and movie_info.galleries else '')
 
 				if not self.fetch_media(movie_path, config.fanart_image, movie_info.fanart_url, crop=True):
@@ -739,14 +758,16 @@ class DVHelper(MovieScraper):
 					self.fetch_media(movie_path, f'{movie_info.number}_trailer{ext}', movie_info.trailer_url)
 
 				step_pbar.update()
+				#endregion
 
-				# 5. 生成NFO文件
+				#region 5. 生成NFO文件
 				step_pbar.set_description(f'生成 NFO 文件')
 				nfo = NFOGenerator(movie_info)
 				nfo.save(f'{movie_path}/{movie_info.number}.nfo')
 				step_pbar.update()
+				#endregion
 
-				# 6. 移动影片源文件到整理后的文件夹并改名
+				#region 6. 移动影片源文件到整理后的文件夹并改名
 				if dir_mode:
 					step_pbar.set_description(f'移动影片文件')
 
@@ -755,13 +776,22 @@ class DVHelper(MovieScraper):
 													.with_suffix(old_path.suffix.lower()).name
 
 					if new_path.exists():
-						logger.warning(f'❌影片文件已存在，请自行比较后手动操作。源文件：{root_dir / old_path}，目标文件：{new_path}')
-						continue
+						old_file_size = old_path.stat().st_size
+						new_file_size = new_path.stat().st_size
 
-					old_path.rename(new_path)
+						if old_file_size <= new_file_size:
+							ignored_path = old_path.parent / f'{config.ignored_file_prefix}{old_path.name}'
+							old_path.rename(ignored_path)
+							ignored_movies.append(old_path)
+						else:
+							old_path.rename(new_path)
+					else:
+						old_path.rename(new_path)
+
 					step_pbar.update()
 
 				logger.info(f'✔ 影片相关文件已保存至：{movie_path}')
+				#endregion
 
 		print()
 		logger.info(f'搜索完成，共搜索整理 {len(keywords)} 部影片，其中 {len(failed_movies)} 部影片获取信息失败')
@@ -769,6 +799,11 @@ class DVHelper(MovieScraper):
 		if failed_movies:
 			print('获取信息失败的影片：')
 			for index, movie in enumerate(failed_movies, 1):
+				print(f'    {index}.{Path(movie).relative_to(root_dir) if dir_mode else movie}')
+
+		if ignored_movies:
+			print('被忽略的影片文件：')
+			for index, movie in enumerate(ignored_movies, 1):
 				print(f'    {index}.{Path(movie).relative_to(root_dir) if dir_mode else movie}')
 
 
