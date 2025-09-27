@@ -36,7 +36,7 @@ DV-Helper/
 - 已安装 Chrome 浏览器（用于登录功能）
 - 网络连接（用于搜索和下载信息）
 
-## 安装方法
+## 安装及使用方法
 
 ### 方法一：使用 pip 安装（推荐）
 
@@ -44,20 +44,25 @@ DV-Helper/
 2. 打开命令行，进入项目根目录
 3. 执行以下命令以开发模式安装：
 
-```bash
-pip install -e .
-```
+    ```bash
+    pip install -e .
+    dvhelper --help
+    ```
 
-此方法会在你的Python环境中安装项目及其依赖，并创建一个名为`dvhelper`的命令行工具，可在任何位置直接使用。
+> 此方法的优点是简单快捷，无需配置环境变量，可在任何位置直接使用`dvhelper`命令，但是会将依赖项安装到全局 Python 环境中。
 
 ### 方法二：使用 Poetry 安装
 
-如果你已安装 Poetry，可以使用以下命令安装：
+1. 克隆或下载本项目到本地
+2. 打开命令行，进入项目根目录
+3. 执行以下命令安装：
 
-```bash
-poetry install
-poetry run dvhelper --help
-```
+    ```bash
+    poetry install
+    poetry run dvhelper --help
+    ```
+
+> 此方法的优点是仅在当前环境中安装项目及其依赖，而不会影响全局 Python 环境，缺点是只能在项目目录下使用`dvhelper`命令。
 
 ## 依赖项
 
@@ -71,10 +76,6 @@ poetry run dvhelper --help
 - rich-argparse (>=1.7.1,<2.0.0)
 
 安装过程中这些依赖会自动安装，无需手动操作。
-
-## 使用方法
-
-安装完成后，可以通过命令行使用 `dvhelper` 命令：
 
 ### 命令行参数
 ```
