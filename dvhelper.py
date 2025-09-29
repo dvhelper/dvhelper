@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 #region Imports
 # 标准库导入
+import enum
 import os
 import sys
 import time
@@ -10,15 +11,14 @@ import argparse
 from pathlib import Path
 import urllib.parse
 from datetime import datetime, timedelta
-from dataclasses import dataclass
-
-# 第三方库导入
-from rich_argparse import RawTextRichHelpFormatter
-# 其它第三方库由lazy_import()导入
+from dataclasses import dataclass, field
 
 # XML处理相关导入
 from xml.dom import minidom
 import xml.etree.ElementTree as ET
+
+# 第三方库导入，其它第三方库由lazy_import()导入
+from rich_argparse import RawTextRichHelpFormatter
 #endregion
 
 
@@ -28,7 +28,7 @@ sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 #endregion
 
 
-__version__ = '0.0.4'
+__version__ = '0.0.5'
 __version_info__ = tuple(int(x) for x in __version__.split('.'))
 
 
@@ -43,6 +43,7 @@ class Config:
 	fanart_image:        str = 'fanart.jpg'
 	poster_image:        str = 'poster.jpg'
 	cookies_file:       Path = Path(__file__).parent.joinpath('cookies.json')
+	actress_alias_file: Path = Path(__file__).parent.joinpath('actress_alias.json')
 	completed_path:      str = '#整理完成#'
 	ignored_file_prefix: str = '##'
 	exclude_path: tuple[str] = (
@@ -79,7 +80,8 @@ class Config:
 	search_target_class: str = 'flex flex-col relative hover:bg-zinc-100 hover:dark:bg-zinc-800'
 	movie_target_class:  str = 'flex flex-col gap-2'
 
-	# Exclude actors
+	# Actors map
+	actress_alias: dict[str, list[str]] = field(default_factory=dict)
 	exclude_actors: tuple[str] = (
 		'まーち', 'ニック', '大村', '平田司', '鮫島', '畑中哲也', '羽田', 'じゅうもんじ', 'マッスル澤野', '北こうじ',
 		'吉野篤史', '南佳也', 'TECH', 'ハカー', '井口', 'タラオ', '日森一', '黒田悠斗', '池沼ミキオ', 'セツネヒデユキ',
@@ -95,9 +97,9 @@ class Config:
 	)
 
 	#region argparse help messages
-	description:   str = f'[b]DV Helper (version [i]{__version__}[/]) - 影片信息搜索和NFO生成工具\n\n  自动搜索影片信息、下载封面图片、生成NFO文件，并按演员分类整理影片\n  支持影片搜索和本地视频批量处理[/]'
-	keywords_help: str = '搜索关键词（如影片编号）或本地视频文件夹路径\n可以使用逗号分隔多个关键词，或指定一个包含视频文件的文件夹路径进行批量处理'
-	depth_help:    str = '文件夹搜索深度（默认：%(default)s，表示仅搜索当前目录）'
+	description:   str = f'[b]DV Helper (version [i]{__version__}[/]) - 影片信息搜索和NFO生成工具\n\n  自动搜索影片信息，下载封面图片、剧照、预告片，生成NFO文件，\n  并按演员分类整理影片，支持在线搜索影片信息和批量处理本地影片目录。[/]'
+	keywords_help: str = '搜索关键词（如影片编号）或本地影片目录路径\n可以使用逗号分隔多个关键词，或指定一个包含影片文件的目录进行批量处理'
+	depth_help:    str = '目录搜索深度（默认：%(default)s，表示仅搜索当前目录）'
 	login_help:    str = '忽略已保存的 Cookie 强制进行新的登录操作'
 	gallery_help:  str = '下载影片的剧照和预告片'
 	epilog:        str = '''
@@ -108,11 +110,11 @@ class Config:
     搜索编号为 [argparse.args]ABCDE-123[/] 的影片信息并在当前目录下生成整理好的影片目录
     可以使用逗号分隔多个搜索关键词
 
-  [b]批量处理文件夹中的视频[/]
+  [b]批量处理目录中的影片文件[/]
     [argparse.prog]%(prog)s[/] [argparse.args]/path/to/movies[/] -d [argparse.metavar]1[/]
 
-    扫描指定文件夹及其子目录中的视频文件并生成整理好的影片目录
-    使用 -d 参数可以指定子文件夹的扫描深度，否则仅扫描当前目录
+    扫描指定目录及其子目录中的影片文件并生成整理好的影片目录
+    使用 -d 参数可以指定子目录的扫描深度，否则仅扫描当前目录
 
   [b]强制重新登录[/]
     [argparse.prog]%(prog)s[/] [argparse.args]ABCDE-123[/] -l
@@ -137,7 +139,7 @@ class HelpOnErrorParser(argparse.ArgumentParser):
 		sys.exit(2)
 
 
-class MovieInfo(object):
+class MovieInfo():
 	"""影片信息数据类，统一管理影片相关信息
 	
 	Attributes:
@@ -150,7 +152,7 @@ class MovieInfo(object):
 		year       : 发行年份
 		runtime    : 影片时长(分钟)
 		tags       : 标签列表
-		actors     : 演员列表
+		actresses  : 女演员列表
 		director   : 导演
 		studio     : 制作商
 		publisher  : 发行商
@@ -170,7 +172,7 @@ class MovieInfo(object):
 		self.year:            str = info.get('year', '')
 		self.runtime:         str = info.get('runtime', '')
 		self.tags:      list[str] = info.get('tags', [])
-		self.actors:    list[str] = info.get('actors', [])
+		self.actresses: list[str] = info.get('actresses', [])
 		self.director:        str = info.get('director', '')
 		self.studio:          str = info.get('studio', '')
 		self.publisher:       str = info.get('publisher', '')
@@ -179,7 +181,7 @@ class MovieInfo(object):
 		self.country:         str = info.get('country', '日本')
 
 
-class NFOGenerator(object):
+class NFOGenerator():
 	"""NFO文件生成器，将影片信息转换为通用的NFO格式"""
 
 	def __init__(self, movie_info: MovieInfo):
@@ -223,11 +225,11 @@ class NFOGenerator(object):
 		if movie_info.publisher:
 			ET.SubElement(self.root, 'publisher').text = movie_info.publisher
 
-		# 演员信息
-		if movie_info.actors:
-			for actor_info in movie_info.actors:
-				actor = ET.SubElement(self.root, 'actor')
-				ET.SubElement(actor, 'name').text = actor_info
+		# 女演员信息
+		if movie_info.actresses:
+			for actress_info in movie_info.actresses:
+				actress = ET.SubElement(self.root, 'actress')
+				ET.SubElement(actress, 'name').text = actress_info
 
 		# 媒体信息
 		if movie_info.fanart_url:
@@ -253,7 +255,7 @@ class NFOGenerator(object):
 			f.write(pretty_xml)
 
 
-class MovieParser(object):
+class MovieParser():
 	"""影片信息解析器，从HTML内容提取影片相关信息"""
 
 	@staticmethod
@@ -363,13 +365,26 @@ class MovieParser(object):
 			elif item.startswith('标签:'):
 				result['tags'] = [tag.strip() for tag in item.replace('标签:', '').split(',') if tag.strip()]
 			elif item.startswith('演员:'):
-				result['actors'] = [actor.strip() for actor in item.replace('演员:', '').split(',') if actor.strip()]
-				result['actors'] = [actor for actor in result['actors'] if actor not in config.exclude_actors]
+				result['actresses'] = [actress.strip() for actress in item.replace('演员:', '').split(',') if actress.strip()]
+				result['actresses'] = [actress for actress in result['actresses'] if actress not in config.exclude_actors]
+
+				if len(config.actress_alias):
+					result['actresses'] = [MovieParser.__resolve_actress_alias(actress) for actress in result['actresses']]
 
 		return result
 
+	@staticmethod
+	# https://github.com/Yuukiy/JavSP/blob/master/javsp/__main__.py#L53
+	def __resolve_actress_alias(name: str):
+		"""将别名解析为固定的名字"""
+		for fixed_name, aliases in config.actress_alias.items():
+			if name in aliases:
+				return fixed_name
 
-class MovieScraper(object):
+		return name
+
+
+class MovieScraper():
 	"""影片信息抓取器，实现登录管理、数据和图片的抓取流程"""
 
 	REQUESTS_HEADERS = {
@@ -384,7 +399,7 @@ class MovieScraper(object):
 		self.__session = self.check_cookies()
 
 		if not self.__session:
-			logger.warning('❌未找到有效Cookies，将使用匿名会话，或使用 -l 参数进行登录操作')
+			logger.warning('🚫 未找到有效Cookies，将使用匿名会话，或使用 -l 参数进行登录操作')
 
 	def check_cookies(self):
 		"""检查并加载Cookie，验证有效性
@@ -393,7 +408,7 @@ class MovieScraper(object):
 			有效的requests会话对象，Cookies过期或不存在则返回None
 		"""
 		if not config.cookies_file.exists():
-			logger.warning('❌Cookies 文件不存在')
+			logger.warning('🚫 Cookies 文件不存在')
 			return
 
 		session = requests.Session()
@@ -407,12 +422,12 @@ class MovieScraper(object):
 					expiry_time = datetime.fromtimestamp(cookie['expiry'])
 
 					if expiry_time < datetime.now() - timedelta(seconds=60):
-						logger.warning('❌当前 Cookie 已过期')
+						logger.warning('🚫 当前 Cookie 已过期')
 
 						return
 
 				session.cookies.set(
-					cookie['name'], 
+					cookie['name'],
 					cookie['value'],
 					domain=cookie.get('domain'),
 					path=cookie.get('path', '/'),
@@ -421,7 +436,7 @@ class MovieScraper(object):
 
 			return session
 		except Exception as e:
-			logger.error(f'❌Cookies 文件处理失败：{str(e)}')
+			logger.error('🚫 Cookies 文件处理失败：%s', str(e))
 			return
 
 	def perform_login(self):
@@ -437,7 +452,7 @@ class MovieScraper(object):
 		driver = webdriver.Chrome(options=chrome_options)
 
 		try:
-			logger.info('♻正在启动 Chrome 浏览器...')
+			logger.info('🔄 正在启动 Chrome 浏览器...')
 
 			print('在弹出的网页中完成登录操作\n'*3)
 			driver.get(config.sign_in_url)
@@ -452,14 +467,14 @@ class MovieScraper(object):
 			with open(config.cookies_file, 'w', encoding='utf-8') as f:
 				json.dump(cookies, f, ensure_ascii=False, indent=2)
 
-			logger.info(f'已保存 {len(cookies)} 个 Cookie 到 {config.cookies_file}')
+			logger.info('✅已保存 %d 个 Cookie 到 %s', len(cookies), config.cookies_file)
 
 			# 创建会话并加载Cookie
 			session = requests.Session()
 
 			for cookie in cookies:
 				session.cookies.set(
-					cookie['name'], 
+					cookie['name'],
 					cookie['value'],
 					domain=cookie.get('domain'),
 					path=cookie.get('path', '/'),
@@ -467,7 +482,7 @@ class MovieScraper(object):
 				)
 		except Exception as e:
 			session = None
-			logger.error(f'❌用户登录失败')
+			logger.error('🚫 用户登录失败')
 		finally:
 			time.sleep(2)
 			driver.quit()
@@ -581,6 +596,132 @@ class DVHelper(MovieScraper):
 	def __init__(self):
 		super().__init__()
 
+	def organize_folders(self, root_dir: Path):
+		"""整理指定目录下的影片文件夹
+
+		Args:
+			root_dir: 要整理的根目录
+		"""
+		# 构建反向别名映射表，用于快速查找固定名称
+		reverse_alias_map = {}
+		for fixed_name, aliases in config.actress_alias.items():
+			for alias in aliases:
+				reverse_alias_map[alias] = fixed_name
+
+		# 收集所有子目录中的需要处理的文件夹
+		def collect_folders_recursive(directory: Path):
+			for item in directory.iterdir():
+				if item.is_dir():
+					fixed_name = reverse_alias_map.get(item.name)
+
+					if fixed_name:
+						if item.name == fixed_name:
+							continue
+
+						folders_to_process.append((item, fixed_name))
+					else:
+						collect_folders_recursive(item)
+
+		folders_to_process = []
+		collect_folders_recursive(root_dir)
+
+		if not folders_to_process:
+			logger.info('🚫 未发现需要整理的影片文件夹')
+			return
+
+		logger.info(f'发现 {len(folders_to_process)} 个需要整理的影片文件夹')
+
+		# 处理每个需要重命名的目录
+		for index, (source_folder, target_name) in enumerate(folders_to_process, start=1):
+			target_folder = source_folder.parent / target_name
+
+			print()
+			logger.info(f'[{index}/{len(folders_to_process)}] 🔄 正在处理 {source_folder}...')
+
+			try:
+				if not target_folder.exists():
+					# source_folder.rename(target_folder)
+					logger.info(f'已将文件夹重命名为: {target_folder}')
+				else:
+					logger.info(f'目标 {target_folder} 已存在，正在合并文件夹...')
+					self._merge_folders(source_folder, target_folder)
+					logger.info(f'已完成与目标文件夹 {target_folder} 的合并')
+			except Exception as e:
+				logger.error(f'🚫 处理文件夹 {source_folder} 时出错: {str(e)}')
+
+	def _merge_folders(self, source_folder: Path, target_folder: Path):
+		"""合并两个文件夹的内容
+
+		Args:
+			source_folder: 源文件夹
+			target_folder: 目标文件夹
+		"""
+		for item in source_folder.iterdir():
+			if item.is_dir():
+				target_item = target_folder / item.name
+				if target_item.exists() and target_item.is_dir():
+					logger.info(f'正在比较文件夹 {item.name}...')
+					self._merge_movie_folders(item, target_item)
+				else:
+					# item.rename(target_item)
+					logger.info(f'已移动子文件夹 {item.name}')
+			else:
+				target_item = target_folder / item.name
+				if not target_item.exists():
+					# item.rename(target_item)
+					logger.info(f'已移动文件 {item.name}')
+
+		# source_folder.rmdir()
+		logger.info(f'已删除源文件夹: {source_folder}')
+
+	def _merge_movie_folders(self, source_folder: Path, target_folder: Path):
+		"""合并两个影片文件夹，保留较大的视频文件
+
+		Args:
+			source_folder: 源影片文件夹
+			target_folder: 目标影片文件夹
+		"""
+		source_movies = {}
+		for item in source_folder.iterdir():
+			if item.is_file() and any(item.name.lower().endswith(ext) for ext in config.movie_file_extensions):
+				source_movies[item.name.lower()] = item
+
+		target_movies = {}
+		for item in target_folder.iterdir():
+			if item.is_file() and any(item.name.lower().endswith(ext) for ext in config.movie_file_extensions):
+				target_movies[item.name.lower()] = item
+
+		for movie_name, source_movie in source_movies.items():
+			if movie_name in target_movies:
+				target_movie = target_movies[movie_name]
+				source_size = source_movie.stat().st_size
+				target_size = target_movie.stat().st_size
+
+				if source_size > target_size:
+					# target_movie.unlink()
+					# source_movie.rename(target_folder / source_movie.name)
+					logger.info(f'保留源视频并删除目标文件夹同名文件：{source_movie.name}')
+				else:
+					# source_movie.unlink()
+					logger.info(f'保留目标视频并删除源文件夹同名文件：{target_movie.name}')
+			else:
+				# source_movie.rename(target_folder / source_movie.name)
+				logger.info(f'已移动视频文件: {source_movie.name}')
+
+		# 移动源文件夹中的非视频文件
+		for item in source_folder.iterdir():
+			if item.is_file() and not any(item.name.lower().endswith(ext) for ext in config.movie_file_extensions):
+				target_item = target_folder / item.name
+				if not target_item.exists():
+					# item.rename(target_item)
+					pass
+				else:
+					# item.unlink()
+					pass
+
+		# source_folder.rmdir()
+		logger.info(f'已删除源影片文件夹 {source_folder.name}')
+
 	def analyze_keyword(self, keyword: str):
 		"""从已知信息中分析并提取影片ID
 
@@ -672,12 +813,12 @@ class DVHelper(MovieScraper):
 			keyword = Path(item).name if dir_mode else item
 
 			print()
-			logger.info(f'[{index}/{len(keywords)}] ♻ 正在搜索 {keyword}...')
+			logger.info(f'[{index}/{len(keywords)}] 🔄 正在搜索 {keyword}...')
 
 			movie_id = self.analyze_keyword(keyword)
 
 			if not movie_id:
-				logger.warning('❌无法提取影片ID，可以尝试修改文件名后再试')
+				logger.warning('🚫 无法提取影片ID，可以尝试修改文件名后再试')
 				failed_movies.append(item)
 				continue
 
@@ -691,7 +832,7 @@ class DVHelper(MovieScraper):
 				search_results = MovieParser.parse_search_results(response_text, movie_id)
 
 				if not search_results:
-					logger.warning('❌未找到匹配的影片')
+					logger.warning('🚫 未找到匹配的影片')
 					failed_movies.append(item)
 					continue
 
@@ -704,7 +845,7 @@ class DVHelper(MovieScraper):
 				movie_details = MovieParser.parse_movie_details(response_text)
 
 				if not movie_details:
-					logger.warning('❌无法获取影片详情')
+					logger.warning('🚫 无法获取影片详情')
 					failed_movies.append(item)
 					continue
 
@@ -721,12 +862,12 @@ class DVHelper(MovieScraper):
 
 				#region 3. 按演员组织目录结果并创建影片目录
 				step_pbar.set_description('创建影片目录')
-				actor_count = len(movie_info.actors)
+				actress_count = len(movie_info.actresses)
 
-				if actor_count == 0:
+				if actress_count == 0:
 					dir1 = '==无名演员=='
-				elif actor_count == 1:
-					dir1 = movie_info.actors[0]
+				elif actress_count == 1:
+					dir1 = movie_info.actresses[0]
 				else:
 					dir1 = '==多演员=='
 
@@ -740,7 +881,7 @@ class DVHelper(MovieScraper):
 				step_pbar.set_description('下载封面图片' + '和剧照' if gallery and movie_info.galleries else '')
 
 				if not self.fetch_media(movie_path, config.fanart_image, movie_info.fanart_url, crop=True):
-					logger.warning('❌封面图片下载失败')
+					logger.warning('🚫 封面图片下载失败')
 					failed_movies.append(item)
 					continue
 
@@ -748,13 +889,13 @@ class DVHelper(MovieScraper):
 				if gallery and movie_info.galleries:
 					for i, gallery_url in enumerate(movie_info.galleries):
 						_, ext = os.path.splitext(gallery_url.split('?')[0])
-						ext = ext.lower() if ext else '.jpg'
+						ext = ext.lower() or '.jpg'
 						self.fetch_media(movie_path, f'gallery_{i:02d}{ext}', gallery_url)
 
 				# 下载预告片
 				if gallery and movie_info.trailer_url:
 					_, ext = os.path.splitext(movie_info.trailer_url.split('?')[0])
-					ext = ext.lower() if ext else '.mp4'
+					ext = ext.lower() or '.mp4'
 					self.fetch_media(movie_path, f'{movie_info.number}_trailer{ext}', movie_info.trailer_url)
 
 				step_pbar.update()
@@ -790,7 +931,7 @@ class DVHelper(MovieScraper):
 
 					step_pbar.update()
 
-				logger.info(f'✔ 影片相关文件已保存至：{movie_path}')
+				logger.info(f'✅ 影片相关文件已保存至：{movie_path}')
 				#endregion
 
 		print()
@@ -871,6 +1012,7 @@ def main():
 	parser.add_argument('-d', '--depth', type=int, default=0, help=config.depth_help)
 	parser.add_argument('-g', '--gallery', action='store_true', help=config.gallery_help)
 	parser.add_argument('-l', '--login', action='store_true', help=config.login_help)
+	parser.add_argument('-o', '--organize', action='store_true', help='（模拟操作）整理并重命名指定目录下的影片文件夹')
 
 	if len(sys.argv) == 1:
 		parser.print_help()
@@ -888,18 +1030,30 @@ def main():
 
 	dv_helper.initialize_session()
 
+	if config.actress_alias_file.exists():
+		with open(config.actress_alias_file, 'r', encoding='utf-8') as file:
+			config.actress_alias = json.load(file)
+
 	if Path(keywords_or_path).absolute().is_dir():
 		root_dir = Path(keywords_or_path)
+
+		if args.organize:
+			if not config.actress_alias:
+				logger.warning('🚫 actress_alias.json 文件为空或不存在，无法执行重命名操作')
+			else:
+				dv_helper.organize_folders(root_dir)
+			return
+
 		found_files = dv_helper.list_video_files(root_dir, max_depth=args.depth)
 
 		if found_files:
-			logger.info(f'发现 {len(found_files)} 个视频文件')
+			logger.info(f'发现 {len(found_files)} 个影片文件')
 			for index, file_path in enumerate(found_files, 1):
 				print(f'    {index}.{Path(file_path).relative_to(root_dir)}')
 
 			dv_helper.batch_process(found_files, gallery=args.gallery, dir_mode=True, root_dir=root_dir)
 		else:
-			logger.info(f"在 {root_dir} {'及其子目录' if args.depth > 0 else ''}中未发现视频文件")
+			logger.info(f"在 {root_dir} {'及其子目录' if args.depth > 0 else ''}中未发现影片文件")
 	else:
 		keywords = [keyword.strip() for keyword in keywords_or_path.split(',')]
 		logger.info(f'待处理 {len(keywords)} 个影片关键词')
