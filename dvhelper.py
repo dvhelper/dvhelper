@@ -120,6 +120,12 @@ class Config:
     [argparse.prog]%(prog)s[/] [argparse.args]ABCDE-123[/] -l
 
     强制重新登录，忽略已保存的 Cookie 并进行新的登录操作
+
+  [b]整理并重命名影片文件夹（模拟操作）[/]
+    [argparse.prog]%(prog)s[/] [argparse.args]/path/to/movies[/] -o
+
+    以模拟操作方式整理并重命名指定目录下的影片文件夹，不会实际执行文件操作
+    该功能会根据actress_alias.json中的映射表递归查找并识别需要重命名的文件夹
 '''
 	#endregion
 
