@@ -1020,6 +1020,8 @@ def main():
 	parser.add_argument('-l', '--login', action='store_true', help=config.login_help)
 	parser.add_argument('-o', '--organize', action='store_true', help='（模拟操作）整理并重命名指定目录下的影片文件夹')
 
+	args = parser.parse_args()
+
 	if len(sys.argv) == 1:
 		parser.print_help()
 		sys.exit(0)
@@ -1027,7 +1029,6 @@ def main():
 	lazy_import()
 
 	dv_helper = DVHelper()
-	args = parser.parse_args()
 	keywords_or_path: str = args.keywords_or_path
 
 	if args.login:
