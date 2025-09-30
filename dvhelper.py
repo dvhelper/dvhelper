@@ -28,7 +28,7 @@ sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 #endregion
 
 
-__version__ = '0.0.5'
+__version__ = '0.0.6'
 __version_info__ = tuple(int(x) for x in __version__.split('.'))
 
 
@@ -80,21 +80,8 @@ class Config:
 	search_target_class: str = 'flex flex-col relative hover:bg-zinc-100 hover:dark:bg-zinc-800'
 	movie_target_class:  str = 'flex flex-col gap-2'
 
-	# Actors map
+	# Actress name map
 	actress_alias: dict[str, list[str]] = field(default_factory=dict)
-	exclude_actors: tuple[str] = (
-		'まーち', 'ニック', '大村', '平田司', '鮫島', '畑中哲也', '羽田', 'じゅうもんじ', 'マッスル澤野', '北こうじ',
-		'吉野篤史', '南佳也', 'TECH', 'ハカー', '井口', 'タラオ', '日森一', '黒田悠斗', '池沼ミキオ', 'セツネヒデユキ',
-		'えりぐち', '貞松大輔', '野島誠', 'ダイ', 'ナイアガラ翔', '矢野慎二', '阿部智広', '志良玉弾吾', '北山シロ',
-		'真田京', '西島雄介', '堀内ハジメ', '藍井優太', '左慈半造', 'トニー大木', 'ラリアット黒川', '結城結弦', '中田一平',
-		'市川潤', 'かめじろう', 'イセドン内村', '小田切ジュン', '上田昌宏', 'ジャイアント廣田', '杉山', '片山邦生',
-		'松本ケン', '武田大樹', 'ようく', '市川哲也', '吉村卓', 'たこにゃん', '大沢真司', '今井勇太', '田淵正浩',
-		'桜井ちんたろう',  'アベ', 'ゴロー', '優生', 'Qべぇ', '沢木和也', '岩下たろう', '戸川夏也', '松山伸也',
-		'タツ', 'テツ神山', '瀧口', '左曲かおる', '杉浦ボッ樹', 'ウルフ田中', 'ゆうき', 'ピエール剣', '一馬', '--',
-		'桐島達也', '七尾神', 'フランクフルト林', 'ナルシス小林', 'カルロス', 'たむらあゆむ', '橋本誠吾', '羽田貴史',
-		'森林原人', 'およよ中野', 'ひょこり', '堀尾', 'しめじ', '太刀茜祢', '黒井ゆう', 'マサムー', 'レンジャー鏑木',
-		'ドピュー', '佐川銀次', '渋谷優太', 'ハッピー池田',
-	)
 
 	#region argparse help messages
 	description:   str = f'[b]DV Helper (version [i]{__version__}[/]) - 影片信息搜索和NFO生成工具\n\n  自动搜索影片信息，下载封面图片、剧照、预告片，生成NFO文件，\n  并按演员分类整理影片，支持在线搜索影片信息和批量处理本地影片目录。[/]'
@@ -323,7 +310,11 @@ class MovieParser():
 			li_elements = ul_element.find_all('li')
 
 			if li_elements:
-				li_contents = [li.get_text(strip=True) for li in li_elements]
+				li_contents = []
+				for li in li_elements:
+					for male_a in li.find_all('a', class_='male'):
+						male_a.extract()
+					li_contents.append(li.get_text(strip=True))
 				results = MovieParser.__extract_info_from_list(li_contents)
 
 		results['galleries'] = []
@@ -372,7 +363,6 @@ class MovieParser():
 				result['tags'] = [tag.strip() for tag in item.replace('标签:', '').split(',') if tag.strip()]
 			elif item.startswith('演员:'):
 				result['actresses'] = [actress.strip() for actress in item.replace('演员:', '').split(',') if actress.strip()]
-				result['actresses'] = [actress for actress in result['actresses'] if actress not in config.exclude_actors]
 
 				if len(config.actress_alias):
 					result['actresses'] = [MovieParser.__resolve_actress_alias(actress) for actress in result['actresses']]
@@ -650,12 +640,12 @@ class DVHelper(MovieScraper):
 					logger.info(f'已将文件夹重命名为: {target_folder}')
 				else:
 					logger.info(f'目标 {target_folder} 已存在，正在合并文件夹...')
-					self._merge_folders(source_folder, target_folder)
+					self.__merge_folders(source_folder, target_folder)
 					logger.info(f'已完成与目标文件夹 {target_folder} 的合并')
 			except Exception as e:
 				logger.error(f'🚫 处理文件夹 {source_folder} 时出错: {str(e)}')
 
-	def _merge_folders(self, source_folder: Path, target_folder: Path):
+	def __merge_folders(self, source_folder: Path, target_folder: Path):
 		"""合并两个文件夹的内容
 
 		Args:
@@ -667,7 +657,7 @@ class DVHelper(MovieScraper):
 				target_item = target_folder / item.name
 				if target_item.exists() and target_item.is_dir():
 					logger.info(f'正在比较文件夹 {item.name}...')
-					self._merge_movie_folders(item, target_item)
+					self.__merge_movie_folders(item, target_item)
 				else:
 					# item.rename(target_item)
 					logger.info(f'已移动子文件夹 {item.name}')
@@ -680,7 +670,7 @@ class DVHelper(MovieScraper):
 		# source_folder.rmdir()
 		logger.info(f'已删除源文件夹: {source_folder}')
 
-	def _merge_movie_folders(self, source_folder: Path, target_folder: Path):
+	def __merge_movie_folders(self, source_folder: Path, target_folder: Path):
 		"""合并两个影片文件夹，保留较大的视频文件
 
 		Args:
