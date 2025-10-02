@@ -63,7 +63,7 @@ try {
         Write-Host "Running git log command between $LAST_TAG and $TagName"
         # 在PowerShell中使用更可靠的方式执行git命令并捕获输出
         # 使用单引号和字符串连接来避免PowerShell解析git格式化参数
-        $logCommand = 'git log ' + $LAST_TAG + '..' + $TagName + ' --pretty=format:"' + $format + '" --reverse'
+        $logCommand = 'git log ' + $LAST_TAG + '..' + $TagName + ' --pretty=format:"' + $format + '"'
         Write-Host "Executing: $logCommand"
         $COMMITS = Invoke-Expression -Command $logCommand | Out-String
         # 去除首尾空白字符
@@ -84,7 +84,7 @@ try {
         # 尝试获取当前标签的所有提交
         # 使用相同的可靠方式执行git命令
         # 使用单引号和字符串连接来避免PowerShell解析git格式化参数
-        $logCommand = 'git log ' + $TagName + ' --pretty=format:"' + $format + '" --reverse'
+        $logCommand = 'git log ' + $TagName + ' --pretty=format:"' + $format + '"'
         Write-Host "Executing: $logCommand"
         $COMMITS = Invoke-Expression -Command $logCommand | Out-String
         $COMMITS = $COMMITS.Trim()
@@ -94,7 +94,7 @@ try {
             Write-Host "No commits found for current tag, getting latest 10 commits"
             # 使用相同的可靠方式执行git命令
             # 使用单引号和字符串连接来避免PowerShell解析git格式化参数
-            $logCommand = 'git log -n 10 --pretty=format:"' + $format + '" --reverse'
+            $logCommand = 'git log -n 10 --pretty=format:"' + $format + '"'
             Write-Host "Executing: $logCommand"
             $COMMITS = Invoke-Expression -Command $logCommand | Out-String
             $COMMITS = $COMMITS.Trim()
