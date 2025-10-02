@@ -94,22 +94,20 @@ jobs:
           # 配置git log格式
           $format = '- %s (%an)'
           
-          # 尝试多种方式获取提交历史，确保总能获取到内容
+          # 尝试获取提交历史，严格控制范围
           try {
-            # 方法1：尝试获取上一个标签到当前标签的提交
+            # 方法1：优先尝试获取上一个标签到当前标签的提交
             $LAST_TAG = git describe --tags --abbrev=0 $CURRENT_TAG^ 2>$null
             if ($LAST_TAG) {
               $COMMITS = git log $LAST_TAG..$CURRENT_TAG --pretty=format:$format --reverse
-            }
-            
-            # 方法2：如果方法1失败或返回空，尝试获取指定标签的所有提交
-            if (-not $COMMITS) {
-              $COMMITS = git log $CURRENT_TAG --pretty=format:$format --reverse 2>$null
-            }
-            
-            # 方法3：如果以上方法都失败，获取所有提交（最近10条）
-            if (-not $COMMITS) {
-              $COMMITS = git log --pretty=format:$format --reverse -n 10 2>$null
+              
+              # 如果上一个标签和当前标签之间确实没有提交，使用明确消息
+              if (-not $COMMITS) {
+                $COMMITS = "- $LAST_TAG到$CURRENT_TAG之间没有新提交"
+              }
+            } else {
+              # 如果没有上一个标签，说明这是第一个版本
+              $COMMITS = "- 初始版本发布"
             }
           } catch {
             Write-Host "Error fetching commit history: $_"
