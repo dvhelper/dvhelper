@@ -107,10 +107,10 @@ class Config:
 
     强制重新登录，忽略已保存的 Cookie 并进行新的登录操作
 
-  [b]整理并重命名影片文件夹（模拟操作）[/]
+  [b]整理并重命名影片文件夹[/]
     [argparse.prog]%(prog)s[/] [argparse.args]/path/to/movies[/] -o
 
-    以模拟操作方式整理并重命名指定目录下的影片文件夹，不会实际执行文件操作
+    整理并重命名指定目录下的影片文件夹，不会实际执行文件操作
     该功能会根据actress_alias.json中的映射表递归查找并识别需要重命名的文件夹
 '''
 	#endregion
@@ -1020,7 +1020,7 @@ def main():
 	parser.add_argument('-d', '--depth', type=int, default=0, help=config.depth_help)
 	parser.add_argument('-g', '--gallery', action='store_true', help=config.gallery_help)
 	parser.add_argument('-l', '--login', action='store_true', help=config.login_help)
-	parser.add_argument('-o', '--organize', action='store_true', help='（模拟操作）整理并重命名指定目录下的影片文件夹')
+	parser.add_argument('-o', '--organize', action='store_true', help='整理并重命名指定目录下的影片文件夹')
 
 	if len(sys.argv) == 1:
 		parser.print_help()
@@ -1029,7 +1029,7 @@ def main():
 	lazy_import()
 
 	dv_helper = DVHelper()
-	args = parser.parse_args()
+	args, _ = parser.parse_known_args()
 	keywords_or_path: str = args.keywords_or_path
 
 	if args.login:
