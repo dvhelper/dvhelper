@@ -1,4 +1,4 @@
-<img src="https://github.com/Walkline80/DV-Helper/blob/images/logo.png?raw=true" alt="logo" width="200" height="60" align="right">
+<img src="https://avatars.githubusercontent.com/u/235627946?s=400" alt="logo" width="140" height="140" align="right">
 
 # DV Helper
 
