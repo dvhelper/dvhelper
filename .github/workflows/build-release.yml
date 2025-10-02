@@ -1,0 +1,122 @@
+name: Build and Release DV Helper
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:  # 允许手动触发
+    inputs:
+      tag_name:
+        description: '可选的标签名称，如果不提供则使用默认值'
+        required: false
+        type: string
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write  # 允许创建release
+
+    steps:
+      # 1. 检出代码仓库
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 检出所有历史记录，包括tags
+
+      # 2. 设置Python环境
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: 'x64'
+          cache: 'pip'
+
+      # 3. 缓存Poetry依赖
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v4
+        id: cache-poetry
+        with:
+          path: |
+            ~\AppData\Local\pypoetry\Cache
+            **\.venv
+            **\poetry.lock
+          key: ${{ runner.os }}-python-${{ steps.setup-python.outputs.python-version }}-poetry-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-python-${{ steps.setup-python.outputs.python-version }}-poetry-
+
+      # 4. 安装项目依赖
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install poetry
+          poetry install
+
+      # 4. 使用pyinstaller打包项目
+      - name: Build executable with PyInstaller
+        run: |
+          poetry run pyinstaller --clean --noconfirm make\dvhelper.spec
+
+      # 5. 复制actress_alias.json文件到dist目录
+      - name: Copy actress_alias.json to dist
+        run: |
+          Copy-Item -Path actress_alias.json -Destination dist\actress_alias.json
+
+      # 6. 压缩dist目录为zip文件
+      - name: Create release archive
+        id: create_archive
+        run: |
+          $TAG_NAME = if (-not [string]::IsNullOrEmpty("${{ inputs.tag_name }}")) {
+            "${{ inputs.tag_name }}"
+          } else {
+            $env:GITHUB_REF_NAME
+          }
+
+          $ZIP_NAME = "dvhelper-${TAG_NAME}.zip"
+          Compress-Archive -Path dist\* -DestinationPath $ZIP_NAME
+          echo "archive_name=${ZIP_NAME}" >> $env:GITHUB_OUTPUT
+          echo "tag_name=${TAG_NAME}" >> $env:GITHUB_OUTPUT
+
+      # 7. 获取详细的提交历史
+      - name: Get detailed commit history
+        id: get_commits
+        shell: pwsh
+        run: |
+          # 获取上一个标签到当前标签的提交历史
+          $LAST_TAG = git describe --tags --abbrev=0 ${{ steps.create_archive.outputs.tag_name }}^ 2>$null
+          if ($LAST_TAG) {
+            $format = '- %s (%an)'
+            $COMMITS = git log $LAST_TAG..${{ steps.create_archive.outputs.tag_name }} --pretty=format:$format --reverse
+          } else {
+            # 如果是第一个标签，获取所有提交
+            $format = '- %s (%an)'
+            $COMMITS = git log ${{ steps.create_archive.outputs.tag_name }} --pretty=format:$format --reverse
+          }
+          
+          "commits<<COMMIT_HISTORY" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $COMMITS | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "COMMIT_HISTORY" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      # 8. 创建GitHub Release并上传压缩包
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.create_archive.outputs.archive_name }}
+          name: Release ${{ steps.create_archive.outputs.tag_name }}
+          # 直接在YAML中使用多行字符串格式，确保Markdown正确渲染
+          body: |
+            ## 更新内容
+            
+            ${{ env.commits }}
+            
+            ## 完整变更日志
+            
+            [查看所有提交](https://github.com/${{ github.repository }}/commits/${{ steps.create_archive.outputs.tag_name }})
+          # 不使用GitHub自动生成的release notes
+          generate_release_notes: false
+          # 使用从create_archive步骤获取的标签名称
+          tag_name: ${{ steps.create_archive.outputs.tag_name }}
+          # 允许覆盖已存在的文件
+          overwrite_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
