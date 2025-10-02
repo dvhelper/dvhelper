@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 #region Imports
 # 标准库导入
-import enum
 import os
 import sys
 import time
@@ -265,6 +264,8 @@ class MovieParser():
 		if not html:
 			return
 
+		from bs4 import BeautifulSoup
+
 		soup = BeautifulSoup(html, 'html.parser')
 		elements = soup.find_all(class_=config.search_target_class)
 
@@ -301,6 +302,8 @@ class MovieParser():
 
 		if not html:
 			return results
+
+		from bs4 import BeautifulSoup
 
 		soup = BeautifulSoup(html, 'html.parser')
 		ul_elements = soup.find_all('ul', class_=config.movie_target_class)
@@ -360,9 +363,9 @@ class MovieParser():
 			elif item.startswith('发行商:'):
 				result['publisher'] = item.replace('发行商:', '').strip()
 			elif item.startswith('标签:'):
-				result['tags'] = [tag.strip() for tag in item.replace('标签:', '').split(',') if tag.strip()]
+				result['tags'] = [tag.strip() for tag in item.replace('标签:', '').replace('--', '').split(',') if tag.strip()]
 			elif item.startswith('演员:'):
-				result['actresses'] = [actress.strip() for actress in item.replace('演员:', '').split(',') if actress.strip()]
+				result['actresses'] = [actress.strip() for actress in item.replace('演员:', '').replace('--', '').split(',') if actress.strip()]
 
 				if len(config.actress_alias):
 					result['actresses'] = [MovieParser.__resolve_actress_alias(actress) for actress in result['actresses']]
@@ -441,20 +444,29 @@ class MovieScraper():
 		Returns:
 			登录后的requests会话对象，登录失败则返回None
 		"""
+		from selenium import webdriver
+		from selenium.webdriver.support.ui import WebDriverWait
+		from selenium.webdriver.support import expected_conditions as EC
+		from selenium.webdriver.chrome.options import Options
+		from webdriver_manager.chrome import ChromeDriverManager
+		from selenium.webdriver.chrome.service import Service
+
 		# 配置Chrome选项
 		chrome_options = Options()
 		chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
 
-		driver = webdriver.Chrome(options=chrome_options)
+		# 使用webdriver-manager自动管理ChromeDriver
+		service = Service(ChromeDriverManager().install())
+		driver = webdriver.Chrome(service=service, options=chrome_options)
 
 		try:
 			logger.info('🔄 正在启动 Chrome 浏览器...')
 
-			print('在弹出的网页中完成登录操作\n'*3)
+			print('在弹出的网页中完成登录操作，等待浏览器自动关闭！\n'*3)
 			driver.get(config.sign_in_url)
 
 			# 等待用户完成登录并重定向
-			WebDriverWait(driver, 120).until(
+			WebDriverWait(driver, 3 * 60).until(
 				EC.url_to_be(f'{config.base_url}/')
 			)
 
@@ -463,7 +475,7 @@ class MovieScraper():
 			with open(config.cookies_file, 'w', encoding='utf-8') as f:
 				json.dump(cookies, f, ensure_ascii=False, indent=2)
 
-			logger.info('✅已保存 %d 个 Cookie 到 %s', len(cookies), config.cookies_file)
+			logger.info('✅ 已保存 %d 个 Cookie 到 %s', len(cookies), config.cookies_file)
 
 			# 创建会话并加载Cookie
 			session = requests.Session()
@@ -476,7 +488,7 @@ class MovieScraper():
 					path=cookie.get('path', '/'),
 					secure=cookie.get('secure', False)
 				)
-		except Exception as e:
+		except Exception:
 			session = None
 			logger.error('🚫 用户登录失败')
 		finally:
@@ -497,7 +509,6 @@ class MovieScraper():
 		Returns:
 			响应内容文本，所有重试失败则返回None
 		"""
-
 		for retry in range(1, max_retries + 1):
 			current_timeout = initial_timeout * (backoff_factor ** (retry - 1))
 
@@ -514,7 +525,7 @@ class MovieScraper():
 				response.raise_for_status()
 
 				return response.text
-			except (RequestException, Timeout) as e:
+			except (RequestException, Timeout):
 				if retry >= max_retries:
 					return
 
@@ -561,7 +572,7 @@ class MovieScraper():
 					self.crop_image(media_file, movie_path / config.poster_image)
 
 				return True
-			except (RequestException, Timeout) as e:
+			except (RequestException, Timeout):
 				if retry >= max_retries:
 					return False
 
@@ -572,6 +583,8 @@ class MovieScraper():
 			src_file: 输入图片文件路径
 			dest_file: 输出图片文件路径
 		"""
+		from PIL import Image
+
 		with Image.open(src_file) as source_img:
 			width, height = source_img.size
 
@@ -626,6 +639,8 @@ class DVHelper(MovieScraper):
 			return
 
 		logger.info(f'发现 {len(folders_to_process)} 个需要整理的影片文件夹')
+		for index, (source_folder, target_name) in enumerate(folders_to_process, 1):
+			print(f'    {index}.{Path(source_folder).relative_to(root_dir)}')
 
 		# 处理每个需要重命名的目录
 		for index, (source_folder, target_name) in enumerate(folders_to_process, start=1):
@@ -636,7 +651,7 @@ class DVHelper(MovieScraper):
 
 			try:
 				if not target_folder.exists():
-					# source_folder.rename(target_folder)
+					source_folder.rename(target_folder)
 					logger.info(f'已将文件夹重命名为: {target_folder}')
 				else:
 					logger.info(f'目标 {target_folder} 已存在，正在合并文件夹...')
@@ -659,16 +674,19 @@ class DVHelper(MovieScraper):
 					logger.info(f'正在比较文件夹 {item.name}...')
 					self.__merge_movie_folders(item, target_item)
 				else:
-					# item.rename(target_item)
+					item.rename(target_item)
 					logger.info(f'已移动子文件夹 {item.name}')
 			else:
 				target_item = target_folder / item.name
 				if not target_item.exists():
-					# item.rename(target_item)
+					item.rename(target_item)
 					logger.info(f'已移动文件 {item.name}')
 
-		# source_folder.rmdir()
-		logger.info(f'已删除源文件夹: {source_folder}')
+		try:
+			source_folder.rmdir()
+			logger.info(f'已删除源文件夹 {source_folder}')
+		except Exception:
+			logger.error(f'🚫 无法删除源文件夹 {source_folder}')
 
 	def __merge_movie_folders(self, source_folder: Path, target_folder: Path):
 		"""合并两个影片文件夹，保留较大的视频文件
@@ -694,29 +712,31 @@ class DVHelper(MovieScraper):
 				target_size = target_movie.stat().st_size
 
 				if source_size > target_size:
-					# target_movie.unlink()
-					# source_movie.rename(target_folder / source_movie.name)
+					target_movie.unlink()
+					source_movie.rename(target_folder / source_movie.name)
 					logger.info(f'保留源视频并删除目标文件夹同名文件：{source_movie.name}')
 				else:
-					# source_movie.unlink()
+					source_movie.unlink()
 					logger.info(f'保留目标视频并删除源文件夹同名文件：{target_movie.name}')
 			else:
-				# source_movie.rename(target_folder / source_movie.name)
+				source_movie.rename(target_folder / source_movie.name)
 				logger.info(f'已移动视频文件: {source_movie.name}')
 
 		# 移动源文件夹中的非视频文件
 		for item in source_folder.iterdir():
 			if item.is_file() and not any(item.name.lower().endswith(ext) for ext in config.movie_file_extensions):
 				target_item = target_folder / item.name
-				if not target_item.exists():
-					# item.rename(target_item)
-					pass
-				else:
-					# item.unlink()
-					pass
 
-		# source_folder.rmdir()
-		logger.info(f'已删除源影片文件夹 {source_folder.name}')
+				if not target_item.exists():
+					item.rename(target_item)
+				else:
+					item.unlink()
+
+		try:
+			source_folder.rmdir()
+			logger.info(f'已删除源影片文件夹 {source_folder.name}')
+		except Exception:
+			logger.error(f'🚫 无法删除源影片文件夹 {source_folder.name}')
 
 	def analyze_keyword(self, keyword: str):
 		"""从已知信息中分析并提取影片ID
@@ -944,25 +964,6 @@ class DVHelper(MovieScraper):
 				print(f'    {index}.{Path(movie).relative_to(root_dir) if dir_mode else movie}')
 
 
-def lazy_import():
-	global logger
-	global requests, RequestException, Timeout
-	global BeautifulSoup, Image
-	global webdriver, WebDriverWait, EC, Options
-	global tqdm, trange
-
-	import requests
-	from requests.exceptions import RequestException, Timeout
-	from bs4 import BeautifulSoup
-	from PIL import Image
-	from selenium import webdriver
-	from selenium.webdriver.support.ui import WebDriverWait
-	from selenium.webdriver.support import expected_conditions as EC
-	from selenium.webdriver.chrome.options import Options
-	from tqdm import tqdm, trange
-
-	logger = get_logger()
-
 def get_logger():
 	import logging
 
@@ -990,6 +991,17 @@ def get_logger():
 
 	return logger
 
+def lazy_import():
+	global logger
+	global requests, RequestException, Timeout
+	global tqdm, trange
+
+	import requests
+	from requests.exceptions import RequestException, Timeout
+	from tqdm import tqdm, trange
+
+	logger = get_logger()
+
 def main():
 	"""应用程序入口点"""
 
@@ -1010,8 +1022,6 @@ def main():
 	parser.add_argument('-l', '--login', action='store_true', help=config.login_help)
 	parser.add_argument('-o', '--organize', action='store_true', help='（模拟操作）整理并重命名指定目录下的影片文件夹')
 
-	args = parser.parse_args()
-
 	if len(sys.argv) == 1:
 		parser.print_help()
 		sys.exit(0)
@@ -1019,6 +1029,7 @@ def main():
 	lazy_import()
 
 	dv_helper = DVHelper()
+	args = parser.parse_args()
 	keywords_or_path: str = args.keywords_or_path
 
 	if args.login:
@@ -1036,7 +1047,7 @@ def main():
 
 		if args.organize:
 			if not config.actress_alias:
-				logger.warning('🚫 actress_alias.json 文件为空或不存在，无法执行重命名操作')
+				logger.warning('🚫 actress_alias.json 文件为空或不存在，无法执行整理操作')
 			else:
 				dv_helper.organize_folders(root_dir)
 			return
