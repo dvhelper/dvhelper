@@ -1008,6 +1008,13 @@ def main():
 	global config
 	config = Config()
 
+	# 当程序作为exe运行时，使用sys.executable获取正确的运行目录
+	if getattr(sys, 'frozen', False):
+		# 获取exe所在目录
+		current_dir = Path(sys.executable).parent
+		config.actress_alias_file = current_dir.joinpath('actress_alias.json')
+		config.cookies_file = current_dir.joinpath('cookies.json')
+
 	parser = HelpOnErrorParser(
 		description=config.description,
 		usage='%(prog)s [options] keywords_or_path',
