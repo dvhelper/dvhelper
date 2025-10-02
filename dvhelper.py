@@ -1026,10 +1026,11 @@ def main():
 		parser.print_help()
 		sys.exit(0)
 
+	args, _ = parser.parse_known_args()
+
 	lazy_import()
 
 	dv_helper = DVHelper()
-	args, _ = parser.parse_known_args()
 	keywords_or_path: str = args.keywords_or_path
 
 	if args.login:

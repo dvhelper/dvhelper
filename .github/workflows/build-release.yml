@@ -66,12 +66,18 @@ jobs:
       - name: Create release archive
         id: create_archive
         run: |
+          # 确定标签名称，优先使用手动输入，否则使用环境变量
           $TAG_NAME = if (-not [string]::IsNullOrEmpty("${{ inputs.tag_name }}")) {
             "${{ inputs.tag_name }}"
           } else {
             $env:GITHUB_REF_NAME
           }
-
+          
+          # 验证标签有效性，如果无效则使用默认值
+          if ([string]::IsNullOrEmpty($TAG_NAME) -or $TAG_NAME -eq 'main' -or $TAG_NAME -eq 'master') {
+            $TAG_NAME = "dev-build-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+          }
+          
           $ZIP_NAME = "dvhelper-${TAG_NAME}.zip"
           Compress-Archive -Path dist\* -DestinationPath $ZIP_NAME
           echo "archive_name=${ZIP_NAME}" >> $env:GITHUB_OUTPUT
@@ -82,20 +88,40 @@ jobs:
         id: get_commits
         shell: pwsh
         run: |
-          # 获取上一个标签到当前标签的提交历史
-          $LAST_TAG = git describe --tags --abbrev=0 ${{ steps.create_archive.outputs.tag_name }}^ 2>$null
-          if ($LAST_TAG) {
-            $format = '- %s (%an)'
-            $COMMITS = git log $LAST_TAG..${{ steps.create_archive.outputs.tag_name }} --pretty=format:$format --reverse
-          } else {
-            # 如果是第一个标签，获取所有提交
-            $format = '- %s (%an)'
-            $COMMITS = git log ${{ steps.create_archive.outputs.tag_name }} --pretty=format:$format --reverse
+          # 获取当前标签名称
+          $CURRENT_TAG = "${{ steps.create_archive.outputs.tag_name }}"
+          
+          # 配置git log格式
+          $format = '- %s (%an)'
+          
+          # 尝试获取提交历史，严格控制范围
+          try {
+            # 方法1：优先尝试获取上一个标签到当前标签的提交
+            $LAST_TAG = git describe --tags --abbrev=0 $CURRENT_TAG^ 2>$null
+            if ($LAST_TAG) {
+              $COMMITS = git log $LAST_TAG..$CURRENT_TAG --pretty=format:$format --reverse
+              
+              # 如果上一个标签和当前标签之间确实没有提交，使用明确消息
+              if (-not $COMMITS) {
+                $COMMITS = "- $LAST_TAG到$CURRENT_TAG之间没有新提交"
+              }
+            } else {
+              # 如果没有上一个标签，说明这是第一个版本
+              $COMMITS = "- 初始版本发布"
+            }
+          } catch {
+            Write-Host "Error fetching commit history: $_"
           }
           
-          "commits<<COMMIT_HISTORY" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          $COMMITS | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          "COMMIT_HISTORY" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          # 确保COMMITS不为空，提供默认消息
+          if (-not $COMMITS) {
+            $COMMITS = "- 暂无提交信息"
+          }
+          
+          # 使用文件追加方式设置环境变量，确保多行内容正确处理
+          Add-Content -Path $env:GITHUB_ENV -Value "commits<<EOF"
+          Add-Content -Path $env:GITHUB_ENV -Value $COMMITS
+          Add-Content -Path $env:GITHUB_ENV -Value "EOF"
 
       # 8. 创建GitHub Release并上传压缩包
       - name: Create GitHub Release
