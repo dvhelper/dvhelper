@@ -80,6 +80,7 @@ jobs:
       # 7. 获取详细的提交历史
       - name: Get detailed commit history
         id: get_commits
+        shell: pwsh
         run: |
           # 获取上一个标签到当前标签的提交历史
           $LAST_TAG = git describe --tags --abbrev=0 ${{ steps.create_archive.outputs.tag_name }}^ 2>$null
@@ -92,13 +93,9 @@ jobs:
             $COMMITS = git log ${{ steps.create_archive.outputs.tag_name }} --pretty=format:$format --reverse
           }
           
-          if ($COMMITS -match "\n") {
-            "commits<<EOF" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-            $COMMITS | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-            "EOF" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          } else {
-            echo "commits=$COMMITS" >> $env:GITHUB_ENV
-          }
+          "commits<<COMMIT_HISTORY" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $COMMITS | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "COMMIT_HISTORY" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       # 8. 创建GitHub Release并上传压缩包
       - name: Create GitHub Release
