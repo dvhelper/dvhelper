@@ -108,9 +108,6 @@ jobs:
             
             ${{ env.commits }}
             
-            ## 完整变更日志
-            
-            [查看所有提交](https://github.com/${{ github.repository }}/commits/${{ steps.create_archive.outputs.tag_name }})
           # 不使用GitHub自动生成的release notes
           generate_release_notes: false
           # 使用从create_archive步骤获取的标签名称

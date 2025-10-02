@@ -38,38 +38,17 @@ try {
     # 1. 先尝试使用git describe来找上一个标签（更可靠的git内部方法）
     $LAST_TAG = git describe --tags --abbrev=0 ${TagName}^ 2>$null
     
-    # 如果git describe失败，尝试手动查找
-    if (-not $LAST_TAG) {
-        Write-Host "git describe failed, trying manual search"
-        # 使用git rev-list获取当前标签到根的所有标签
-        $TAG_LIST = git rev-list --tags --max-count=100
-        $SORTED_TAGS = @()
-        foreach ($tag_hash in $TAG_LIST) {
-            $tag = git describe --tags $tag_hash 2>$null
-            if ($tag -and $tag -ne $TagName -and $SORTED_TAGS -notcontains $tag) {
-                $SORTED_TAGS += $tag
-            }
-        }
-        
-        if ($SORTED_TAGS.Length -gt 0) {
-            $LAST_TAG = $SORTED_TAGS[0]
-        }
-    }
-    
-    Write-Host "Last tag found: $LAST_TAG"
-    
     if ($LAST_TAG) {
+        Write-Host "Last tag found: $LAST_TAG"
         # 使用正确的git log语法获取两个标签之间的提交
         Write-Host "Running git log command between $LAST_TAG and $TagName"
         # 在PowerShell中使用更可靠的方式执行git命令并捕获输出
-        # 使用单引号和字符串连接来避免PowerShell解析git格式化参数
-        $logCommand = 'git log ' + $LAST_TAG + '..' + $TagName + ' --pretty=format:"' + $format + '" --reverse'
+        $logCommand = 'git log ' + $LAST_TAG + '..' + $TagName + ' --pretty=format:"' + $format + '"'
         Write-Host "Executing: $logCommand"
         $COMMITS = Invoke-Expression -Command $logCommand | Out-String
         # 去除首尾空白字符
         $COMMITS = $COMMITS.Trim()
         
-        # 使用${}明确界定变量名，避免PowerShell解析错误
         Write-Host ('Commits between ' + $LAST_TAG + ' and ' + $TagName + ':')
         Write-Host $COMMITS
         
@@ -82,22 +61,20 @@ try {
         # 如果没有上一个标签，说明这是第一个版本或没有其他标签
         Write-Host "No previous tag found, trying to get all commits for current tag"
         # 尝试获取当前标签的所有提交
-        # 使用相同的可靠方式执行git命令
-        # 使用单引号和字符串连接来避免PowerShell解析git格式化参数
-        $logCommand = 'git log ' + $TagName + ' --pretty=format:"' + $format + '" --reverse'
+        $logCommand = 'git log ' + $TagName + ' --pretty=format:"' + $format + '"'
         Write-Host "Executing: $logCommand"
         $COMMITS = Invoke-Expression -Command $logCommand | Out-String
         $COMMITS = $COMMITS.Trim()
+        Write-Host $COMMITS
         
         if (-not $COMMITS) {
             # 如果当前标签也没有提交，则获取最近10条提交
             Write-Host "No commits found for current tag, getting latest 10 commits"
-            # 使用相同的可靠方式执行git命令
-            # 使用单引号和字符串连接来避免PowerShell解析git格式化参数
-            $logCommand = 'git log -n 10 --pretty=format:"' + $format + '" --reverse'
+            $logCommand = 'git log -n 10 --pretty=format:"' + $format + '"'
             Write-Host "Executing: $logCommand"
             $COMMITS = Invoke-Expression -Command $logCommand | Out-String
             $COMMITS = $COMMITS.Trim()
+            Write-Host $COMMITS
         }
         
         # 确保COMMITS不为空，提供默认消息
