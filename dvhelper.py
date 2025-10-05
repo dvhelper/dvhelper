@@ -40,7 +40,7 @@ def set_language(lang: str = 'zh_CN'):
 	if not i18n_dir.exists():
 		return
 
-	if lang == 'zh_CN': # default language
+	if lang != 'zh_CN': # default language
 		try:
 			gettext.translation('dvhelper', localedir=str(i18n_dir), languages=[lang]).install()
 		except FileNotFoundError:
@@ -467,7 +467,7 @@ class MovieScraper():
 
 	def perform_login(self):
 		"""
-		使用Selenium执行登录并保存Cookie
+		通过浏览器模拟登录，获取Cookie
 
 		Returns:
 			登录后的requests会话对象，登录失败则返回None
@@ -484,8 +484,12 @@ class MovieScraper():
 		chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
 
 		# 使用webdriver-manager自动管理ChromeDriver
-		service = Service(ChromeDriverManager().install())
-		driver = webdriver.Chrome(service=service, options=chrome_options)
+		driver = None
+		try:
+			service = Service(ChromeDriverManager().install())
+			driver = webdriver.Chrome(service=service, options=chrome_options)
+		except:
+			driver = webdriver.Chrome(options=chrome_options)
 
 		try:
 			logger.info(_('🔄 正在启动 Chrome 浏览器...'))
@@ -1069,13 +1073,16 @@ def main():
 	parser.add_argument('-d', '--depth', type=int, default=0, help=config.depth_help)
 	parser.add_argument('-g', '--gallery', action='store_true', help=config.gallery_help)
 	parser.add_argument('-l', '--login', action='store_true', help=config.login_help)
-	parser.add_argument('-o', '--organize', action='store_true', help=config.organize_help)
+	# parser.add_argument('-o', '--organize', action='store_true', help=config.organize_help)
 
 	if len(sys.argv) == 1:
 		parser.print_help()
 		sys.exit(0)
 
-	args, unknown = parser.parse_known_args()
+	args, unknown_args = parser.parse_known_args()
+
+	if '--lang' in unknown_args:
+		set_language('en_US')
 
 	lazy_import()
 
@@ -1095,7 +1102,7 @@ def main():
 	if Path(keywords_or_path).absolute().is_dir():
 		root_dir = Path(keywords_or_path)
 
-		if args.organize:
+		if any(arg in unknown_args for arg in ['-o', '--organize']):
 			if not config.actress_alias:
 				logger.warning(_('🚫 actress_alias.json 文件为空或不存在，无法执行整理操作'))
 			else:
