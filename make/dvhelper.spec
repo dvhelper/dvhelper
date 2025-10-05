@@ -1,11 +1,26 @@
 # -*- mode: python ; coding: utf-8 -*-
+import os
 
+
+def find_mo_files():
+    mo_files = []
+
+    for root, _, files in os.walk('i18n'):
+        for file in files:
+            _, ext = os.path.splitext(file)
+
+            if ext == '.mo':
+                file_path = os.path.relpath(os.path.join(root, file), '.')
+                dest_path = os.path.dirname(file_path)
+                file_path = os.path.join('..', file_path)
+                mo_files.append((file_path, dest_path))
+    return mo_files
 
 a = Analysis(
     ['..\\dvhelper.py'],
     pathex=[],
     binaries=[],
-    # datas=[('..\\actress_alias.json', '.')],
+    datas=find_mo_files(),
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

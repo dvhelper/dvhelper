@@ -16,6 +16,9 @@ jobs:
     runs-on: windows-latest
     permissions:
       contents: write  # 允许创建release
+    env:
+      PYTHONIOENCODING: "utf-8"
+      PYTEST_ADDOPTS: "-rA --color=yes --tb=long --showlocals"
 
     steps:
       # 1. 检出代码仓库
@@ -32,8 +35,8 @@ jobs:
           architecture: 'x64'
           cache: 'pip'
 
-      # 3. 缓存Poetry依赖
-      - name: Cache Poetry dependencies
+      # 3. 缓存Poetry依赖并安装项目依赖
+      - name: Cache poetry dependencies
         uses: actions/cache@v4
         id: cache-poetry
         with:
@@ -44,25 +47,36 @@ jobs:
           key: ${{ runner.os }}-python-${{ steps.setup-python.outputs.python-version }}-poetry-${{ hashFiles('**/poetry.lock') }}
           restore-keys: |
             ${{ runner.os }}-python-${{ steps.setup-python.outputs.python-version }}-poetry-
+        continue-on-error: true
 
-      # 4. 安装项目依赖
-      - name: Install dependencies
+      - name: Install project dependencies
         run: |
           python -m pip install --upgrade pip
           pip install poetry
+          poetry lock
           poetry install
 
-      # 4. 使用pyinstaller打包项目
+      # 4. 更新可执行文件版本号并编译i18n二进制文件
+      - name: Update executable file version
+        run: |
+          poetry run python .\make\update_version.py
+
+      - name: Compile i18n binary files
+        run: |
+          & .\i18n\make.bat 1
+          & .\i18n\make.bat 3
+
+      # 5. 使用pyinstaller打包项目
       - name: Build executable with PyInstaller
         run: |
           poetry run pyinstaller --clean --noconfirm make\dvhelper.spec
 
-      # 5. 复制actress_alias.json文件到dist目录
+      # 6. 复制actress_alias.json文件到dist目录
       - name: Copy actress_alias.json to dist
         run: |
           Copy-Item -Path actress_alias.json -Destination dist\actress_alias.json
 
-      # 6. 压缩dist目录为zip文件
+      # 7. 压缩dist目录为zip文件
       - name: Create release archive
         id: create_archive
         run: |
@@ -83,7 +97,7 @@ jobs:
           echo "archive_name=${ZIP_NAME}" >> $env:GITHUB_OUTPUT
           echo "tag_name=${TAG_NAME}" >> $env:GITHUB_OUTPUT
 
-      # 7. 获取详细的提交历史并设置为输出
+      # 8. 获取详细的提交历史并设置为输出
       - name: Get detailed commit history
         id: get_commits
         shell: pwsh
@@ -96,7 +110,7 @@ jobs:
           Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
           .\make\get_commit_history.ps1 -TagName $CURRENT_TAG
 
-      # 8. 创建GitHub Release并上传压缩包
+      # 9. 创建GitHub Release并上传压缩包
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
