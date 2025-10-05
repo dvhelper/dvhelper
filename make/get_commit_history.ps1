@@ -34,12 +34,29 @@ try {
     $ALL_TAGS = git tag --list
     Write-Host "All tags found: $ALL_TAGS"
     
-    # 使用更可靠的方法查找上一个标签
-    # 1. 先尝试使用git describe来找上一个标签（更可靠的git内部方法）
-    $LAST_TAG = git describe --tags --abbrev=0 ${TagName}^ 2>$null
+    # 使用语义化版本排序方法查找上一个标签（更可靠的方法）
+    Write-Host "Sorting tags by semantic version..."
+    # 转换为数组并排序
+    [array]$SORTED_TAGS = $ALL_TAGS | Sort-Object { [Version]($_ -replace '^v', '') } -Descending
+    Write-Host "Sorted tags: $SORTED_TAGS"
+    
+    # 查找当前标签在排序后的位置
+    $currentIndex = -1
+    for ($i=0; $i -lt $SORTED_TAGS.Length; $i++) {
+        if ($SORTED_TAGS[$i] -eq $TagName) {
+            $currentIndex = $i
+            break
+        }
+    }
+    
+    # 检查是否找到当前标签且不是最后一个标签
+    $LAST_TAG = $null
+    if ($currentIndex -ge 0 -and $currentIndex -lt $SORTED_TAGS.Length - 1) {
+        $LAST_TAG = $SORTED_TAGS[$currentIndex + 1]
+        Write-Host "Last tag found: $LAST_TAG"
+    }
     
     if ($LAST_TAG) {
-        Write-Host "Last tag found: $LAST_TAG"
         # 使用正确的git log语法获取两个标签之间的提交
         Write-Host "Running git log command between $LAST_TAG and $TagName"
         # 在PowerShell中使用更可靠的方式执行git命令并捕获输出
@@ -93,4 +110,6 @@ try {
 $commitContent = 'commits<<COMMIT_EOF' + "`n" + $COMMITS + "`nCOMMIT_EOF"
 
 # 输出到GitHub环境变量文件
-Write-Output $commitContent | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+if ($env:GITHUB_ENV) {
+    Write-Output $commitContent | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+}
