@@ -434,7 +434,6 @@ class MovieScraper():
 			有效的requests会话对象，Cookies过期或不存在则返回None
 		"""
 		if not config.cookies_file.exists():
-			logger.warning(_('🚫 Cookies 文件不存在'))
 			return
 
 		session = requests.Session()

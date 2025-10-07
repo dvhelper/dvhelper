@@ -50,9 +50,6 @@ msgstr ""
 "🚫 No valid Cookies found, anonymous session will be used, or use the -l "
 "parameter to log in again"
 
-msgid "🚫 Cookies 文件不存在"
-msgstr "🚫 Cookies file missing"
-
 msgid "🚫 当前 Cookie 已过期"
 msgstr "🚫 Current Cookie expired"
 
