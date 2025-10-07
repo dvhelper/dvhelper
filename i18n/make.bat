@@ -116,5 +116,5 @@ exit /b
 REM Compile translation files
 :COMPILE
 echo Compiling translation files...
-poetry run pybabel compile -D %DOMAIN% -d %I18N_DIR% --statistics
+poetry run pybabel compile -D %DOMAIN% -d %I18N_DIR% --statistics --use-fuzzy
 exit /b
