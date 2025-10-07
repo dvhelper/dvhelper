@@ -122,7 +122,9 @@ cd dvhelper
 
 ```bash
 pip install -e .
-dvhelper --help
+i18n\make.bat 3
+dvhelper
+dvhelper . -o --lang
 ```
 
 > 此方法的优点是简单快捷，无需配置环境变量，可在任何位置直接使用`dvhelper`命令，但是会将依赖项安装到全局 Python 环境中。
@@ -131,7 +133,9 @@ dvhelper --help
 
 ```bash
 poetry install
-poetry run dvhelper --help
+i18n\make.bat 3
+poetry run python dvhelper.py
+poetry run python dvhelper.py . -o --lang
 ```
 
 > 此方法的优点是仅在当前环境中安装项目及其依赖，而不会影响全局 Python 环境，缺点是只能在项目目录下使用`dvhelper`命令。
@@ -159,12 +163,12 @@ DV-Helper支持多语言国际化，使用gettext和Babel工具进行翻译管�
    ```
    此命令会：
    - 从源代码中提取所有需要翻译的字符串，更新`i18n/dvhelper.pot`文件
-   - 使用新的pot文件更新现有的英文po文件`i18n/en_US/LC_MESSAGES/dvhelper.po`
+   - 使用新的pot文件更新现有的`i18n/<locale>/LC_MESSAGES/dvhelper.po`文件
 
 2. 初始化新的翻译
    ```bash
    # 在项目根目录下执行
-   call i18n\make.bat 2
+   call i18n\make.bat 2 ja_JP
    ```
    此命令会：
    - 提取字符串并创建pot文件
@@ -177,7 +181,7 @@ DV-Helper支持多语言国际化，使用gettext和Babel工具进行翻译管�
    ```
    此命令会：
    - 将po文件编译成二进制的mo文件
-   - 编译后的mo文件位于`i18n/en_US/LC_MESSAGES/dvhelper.mo`
+   - 编译后的mo文件位于`i18n/<locale>/LC_MESSAGES/dvhelper.mo`
 
 #### 编辑翻译文件
 
