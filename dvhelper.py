@@ -18,8 +18,12 @@ import gettext
 from xml.dom import minidom
 import xml.etree.ElementTree as ET
 
-# 第三方库导入，其它第三方库由lazy_import()导入
+# 第三方库导入，其它第三方库由 lazy_import() 导入
 from rich_argparse import RawTextRichHelpFormatter
+from colorama import Fore, Style
+
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 #endregion
 
 
@@ -29,7 +33,7 @@ sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 #endregion
 
 
-__version__ = '0.0.8'
+__version__ = '0.0.9'
 __version_info__ = tuple(int(x) for x in __version__.split('.'))
 
 
@@ -49,8 +53,6 @@ def set_language(lang: str = 'zh_CN'):
 			except FileNotFoundError:
 				pass
 
-import warnings
-warnings.filterwarnings("ignore", category=DeprecationWarning)
 set_language(locale.getdefaultlocale()[0])
 
 
@@ -150,7 +152,7 @@ class TqdmOut:
 
 class HelpOnErrorParser(argparse.ArgumentParser):
 	def error(self, message):
-		sys.stderr.write(_('🚫 错误: {message}\n').format(message=message))
+		sys.stderr.write(f'{Style.BRIGHT}{Fore.RED}' + _('错误: ') + message + f'{Style.RESET_ALL}\n\n')
 		self.print_help()
 		sys.exit(2)
 
@@ -424,7 +426,7 @@ class MovieScraper():
 		self.__session = self.check_cookies()
 
 		if not self.__session:
-			logger.warning(_('🚫 未找到有效Cookies，将使用匿名会话，或使用 -l 参数重新登录'))
+			logger.warning(_('未找到有效Cookies，将使用匿名会话，或使用 -l 参数重新登录'))
 
 	def check_cookies(self):
 		"""
@@ -447,7 +449,7 @@ class MovieScraper():
 					expiry_time = datetime.fromtimestamp(cookie['expiry'])
 
 					if expiry_time < datetime.now() - timedelta(seconds=60):
-						logger.warning(_('🚫 当前 Cookie 已过期'))
+						logger.warning(_('当前 Cookie 已过期'))
 
 						return
 
@@ -461,7 +463,7 @@ class MovieScraper():
 
 			return session
 		except Exception as e:
-			logger.error(_('🚫 Cookies 文件处理失败: ') + str(e))
+			logger.error(_('Cookies 文件处理失败: ') + str(e))
 			return
 
 	def perform_login(self):
@@ -491,7 +493,7 @@ class MovieScraper():
 			driver = webdriver.Chrome(options=chrome_options)
 
 		try:
-			logger.info(_('🔄 正在启动 Chrome 浏览器...'))
+			logger.info(_('正在启动 Chrome 浏览器...'))
 
 			print(_('在弹出的网页中完成登录操作，等待浏览器自动关闭！\n')*3)
 			driver.get(config.sign_in_url)
@@ -506,7 +508,7 @@ class MovieScraper():
 			with open(config.cookies_file, 'w', encoding='utf-8') as f:
 				json.dump(cookies, f, ensure_ascii=False, indent=2)
 
-			logger.info(_('✅ 已保存 {count} 个 Cookie 到 {file}')
+			logger.info(_('已保存 {count} 个 Cookie 到 {file}')
 				.format(count=len(cookies), file=config.cookies_file))
 
 			# 创建会话并加载Cookie
@@ -522,7 +524,7 @@ class MovieScraper():
 				)
 		except Exception:
 			session = None
-			logger.error(_('🚫 用户登录失败'))
+			logger.error(_('用户登录失败'))
 		finally:
 			time.sleep(2)
 			driver.quit()
@@ -672,7 +674,7 @@ class DVHelper(MovieScraper):
 		collect_folders_recursive(root_dir)
 
 		if not folders_to_process:
-			logger.info(_('🚫 未发现需要整理的影片文件夹'))
+			logger.info(_('未发现需要整理的影片文件夹'))
 			return
 
 		logger.info(_('发现 {count} 个需要整理的影片文件夹:').format(count=len(folders_to_process)))
@@ -685,7 +687,7 @@ class DVHelper(MovieScraper):
 			target_folder = source_folder.parent / target_name
 
 			print()
-			logger.info(f'[{index}/{len(folders_to_process)}]' + _(' 🔄 正在处理: {folder}...')
+			logger.info(f'[{index}/{len(folders_to_process)}] ' + _('正在处理: {folder}...')
 				.format(folder=source_folder))
 
 			try:
@@ -699,7 +701,7 @@ class DVHelper(MovieScraper):
 					logger.info(_('已完成与目标文件夹 {folder} 的合并')
 						.format(folder=target_folder))
 			except Exception as e:
-				logger.error(_('🚫 处理文件夹 {folder} 时出错: {error}')
+				logger.error(_('处理文件夹 {folder} 时出错: {error}')
 					.format(folder=source_folder, error=str(e)))
 
 	def __merge_folders(self, source_folder: Path, target_folder: Path):
@@ -729,7 +731,7 @@ class DVHelper(MovieScraper):
 			source_folder.rmdir()
 			logger.info(_('已删除源文件夹: ') + str(source_folder))
 		except Exception:
-			logger.error(_('🚫 无法删除源文件夹: ') + str(source_folder))
+			logger.error(_('无法删除源文件夹: ') + str(source_folder))
 
 	def __merge_movie_folders(self, source_folder: Path, target_folder: Path):
 		"""
@@ -780,7 +782,7 @@ class DVHelper(MovieScraper):
 			source_folder.rmdir()
 			logger.info(_('已删除源影片文件夹: ') + str(source_folder))
 		except Exception:
-			logger.error(_('🚫 无法删除源影片文件夹: ') + str(source_folder))
+			logger.error(_('无法删除源影片文件夹: ') + str(source_folder))
 
 	def analyze_keyword(self, keyword: str):
 		"""
@@ -875,13 +877,13 @@ class DVHelper(MovieScraper):
 			keyword = Path(item).name if dir_mode else item
 
 			print()
-			logger.info(f'[{index}/{len(keywords)}]' + _(' 🔄 正在搜索: {keyword}...')
+			logger.info(f'[{index}/{len(keywords)}] ' + _('正在搜索: {keyword}...')
 				.format(keyword=keyword))
 
 			movie_id = self.analyze_keyword(keyword)
 
 			if not movie_id:
-				logger.warning(_('🚫 无法解析影片ID，尝试修改文件名后重试'))
+				logger.warning(_('无法解析影片ID，尝试修改文件名后重试'))
 				failed_movies.append(item)
 				continue
 
@@ -895,7 +897,7 @@ class DVHelper(MovieScraper):
 				search_results = MovieParser.parse_search_results(response_text, movie_id)
 
 				if not search_results:
-					logger.warning(_('🚫 未找到匹配的影片'))
+					logger.warning(_('未找到匹配的影片'))
 					failed_movies.append(item)
 					continue
 
@@ -908,7 +910,7 @@ class DVHelper(MovieScraper):
 				movie_details = MovieParser.parse_movie_details(response_text)
 
 				if not movie_details:
-					logger.warning(_('🚫 无法获取影片详情'))
+					logger.warning(_('无法获取影片详情'))
 					failed_movies.append(item)
 					continue
 
@@ -944,7 +946,7 @@ class DVHelper(MovieScraper):
 				step_pbar.set_description(_('正在下载封面') + _('和剧照') if gallery and movie_info.galleries else '')
 
 				if not self.fetch_media(movie_path, config.fanart_image, movie_info.fanart_url, crop=True):
-					logger.warning(_('🚫 封面图片下载失败'))
+					logger.warning(_('封面图片下载失败'))
 					failed_movies.append(item)
 					continue
 
@@ -994,7 +996,7 @@ class DVHelper(MovieScraper):
 
 					step_pbar.update()
 
-				logger.info(_('✅ 影片相关文件已保存至: ') + str(movie_path))
+				logger.info(_('影片相关文件已保存至: ') + str(movie_path))
 				#endregion
 
 		print()
@@ -1027,8 +1029,20 @@ def get_logger():
 	file_handler = logging.FileHandler('dvhelper.log', encoding='utf-8')
 	file_handler.setFormatter(file_formatter)
 
-	# 控制台处理器 - 简洁格式用于控制台显示
-	console_formatter = logging.Formatter('%(message)s')
+	class ColoredFormatter(logging.Formatter):
+		"""根据日志等级添加颜色的格式化器"""
+		def format(self, record):
+			message = record.getMessage()
+
+			# 根据日志等级设置颜色
+			if record.levelno == logging.ERROR:
+				message = f'{Style.BRIGHT}{Fore.RED}{message}{Style.RESET_ALL}'
+			elif record.levelno == logging.WARNING:
+				message = f'{Style.BRIGHT}{Fore.YELLOW}{message}{Style.RESET_ALL}'
+
+			return message
+
+	console_formatter = ColoredFormatter()
 	console_handler = logging.StreamHandler(sys.stdout)
 	console_handler.setFormatter(console_formatter)
 	console_handler.stream = TqdmOut
@@ -1103,7 +1117,7 @@ def main():
 
 		if any(arg in unknown_args for arg in ['-o', '--organize']):
 			if not config.actress_alias:
-				logger.warning(_('🚫 actress_alias.json 文件为空或不存在，无法执行整理操作'))
+				logger.warning(_('actress_alias.json 文件为空或不存在，无法执行整理操作'))
 			else:
 				dv_helper.organize_folders(root_dir)
 			return

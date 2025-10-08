@@ -11,23 +11,22 @@ msgstr ""
 "\n"
 "  Searching for movie information, download cover, stills images, also "
 "trailers, generate NFO files.\n"
-"  Organize movies by actresses, and support online movie information "
-"search as well as batch processing of local movie directories."
+"  Organize movies by actresses, and support online movie information search "
+"as well as batch processing of local movie directories."
 
 msgid ""
 "搜索关键词（如影片编号）或本地影片目录路径\n"
 "可以使用逗号分隔多个关键词，或指定一个包含影片文件的目录进行批量处理"
 msgstr ""
-"search for keywords (e.g., movie ID) or the directory path of local "
-"movies\n"
+"search for keywords (e.g., movie ID) or the directory path of local movies\n"
 "multiple keywords can be separated by commas\n"
 "or a directory containing movie files can be specified"
 
 #, python-format
 msgid "目录搜索深度（默认: %(default)s，表示仅搜索当前目录）"
 msgstr ""
-"directory search depth (Default: %(default)s, only the current directory "
-"is searched)"
+"directory search depth (Default: %(default)s, only the current directory is "
+"searched)"
 
 msgid "下载影片剧照和预告片"
 msgstr "download movie stills and trailers"
@@ -38,36 +37,35 @@ msgstr "ignore saved cookies and force a new login operation"
 msgid "整理并重命名指定目录下的影片文件夹"
 msgstr "organize and rename the movie folders in the specified directory"
 
-#, python-brace-format
-msgid "🚫 错误: {message}\n"
-msgstr "🚫 error: {message}\n"
+msgid "错误: "
+msgstr "Error: "
 
 msgid "日本"
 msgstr "Japan"
 
-msgid "🚫 未找到有效Cookies，将使用匿名会话，或使用 -l 参数重新登录"
+msgid "未找到有效Cookies，将使用匿名会话，或使用 -l 参数重新登录"
 msgstr ""
-"🚫 No valid Cookies found, anonymous session will be used, or use the -l "
+"No valid Cookies found, anonymous session will be used, or use the -l "
 "parameter to log in again"
 
-msgid "🚫 当前 Cookie 已过期"
-msgstr "🚫 Current Cookie expired"
+msgid "当前 Cookie 已过期"
+msgstr "Current Cookie expired"
 
-msgid "🚫 Cookies 文件处理失败: "
-msgstr "🚫 Failed to process Cookies file: "
+msgid "Cookies 文件处理失败: "
+msgstr "Failed to process Cookies file: "
 
-msgid "🔄 正在启动 Chrome 浏览器..."
-msgstr "🔄 Launching Chrome browser..."
+msgid "正在启动 Chrome 浏览器..."
+msgstr "Launching Chrome browser..."
 
 msgid "在弹出的网页中完成登录操作，等待浏览器自动关闭！\n"
 msgstr "Complete login in the browser and wait for it close automatically!\n"
 
 #, python-brace-format
-msgid "✅ 已保存 {count} 个 Cookie 到 {file}"
-msgstr "✅ Saved {count} Cookies to {file}"
+msgid "已保存 {count} 个 Cookie 到 {file}"
+msgstr "Saved {count} Cookies to {file}"
 
-msgid "🚫 用户登录失败"
-msgstr "🚫 User login failed"
+msgid "用户登录失败"
+msgstr "User login failed"
 
 #, python-brace-format
 msgid "第 {retry}/{retries} 次尝试（超时时间: {timeout} 秒）"
@@ -76,16 +74,16 @@ msgstr "Attempt {retry}/{retries} (Timeout: {timeout} seconds)"
 msgid "媒体文件: "
 msgstr "Media File: "
 
-msgid "🚫 未发现需要整理的影片文件夹"
-msgstr "🚫 No movie folders requiring organization found"
+msgid "未发现需要整理的影片文件夹"
+msgstr "No movie folders requiring organization found"
 
 #, python-brace-format
 msgid "发现 {count} 个需要整理的影片文件夹:"
 msgstr "Found {count} movie folder(s):"
 
 #, python-brace-format
-msgid " 🔄 正在处理: {folder}..."
-msgstr " 🔄 Processing: {folder}..."
+msgid "正在处理: {folder}..."
+msgstr "Processing: {folder}..."
 
 msgid "影片文件夹已重命名为: "
 msgstr "Movie folder renamed to: "
@@ -99,8 +97,8 @@ msgid "已完成与目标文件夹 {folder} 的合并"
 msgstr "Merge with target folder {folder} completed"
 
 #, python-brace-format
-msgid "🚫 处理文件夹 {folder} 时出错: {error}"
-msgstr "🚫 Error processing folder {folder}: {error}"
+msgid "处理文件夹 {folder} 时出错: {error}"
+msgstr "Error processing folder {folder}: {error}"
 
 #, python-brace-format
 msgid "正在比较文件夹: {folder}..."
@@ -115,18 +113,16 @@ msgstr "Files moved: "
 msgid "已删除源文件夹: "
 msgstr "Source folder deleted: "
 
-msgid "🚫 无法删除源文件夹: "
-msgstr "🚫 Failed to delete source folder: "
+msgid "无法删除源文件夹: "
+msgstr "Failed to delete source folder: "
 
 msgid "保留源视频并删除目标文件夹同名文件: "
 msgstr ""
-"Keep source movie and delete file with the same name in the target "
-"folder: "
+"Keep source movie and delete file with the same name in the target folder: "
 
 msgid "保留目标视频并删除源文件夹同名文件: "
 msgstr ""
-"Keep target movie and delete file with the same name in the source "
-"folder: "
+"Keep target movie and delete file with the same name in the source folder: "
 
 msgid "已移动视频文件: "
 msgstr "Movie file moved: "
@@ -134,18 +130,18 @@ msgstr "Movie file moved: "
 msgid "已删除源影片文件夹: "
 msgstr "Source movie folder deleted: "
 
-msgid "🚫 无法删除源影片文件夹: "
-msgstr "🚫 Failed to delete source movie folder: "
+msgid "无法删除源影片文件夹: "
+msgstr "Failed to delete source movie folder: "
 
 msgid "目录模式下必须提供根目录路径"
 msgstr "root_dir must be provided in directory mode"
 
 #, python-brace-format
-msgid " 🔄 正在搜索: {keyword}..."
-msgstr " 🔄 Searching: {keyword}..."
+msgid "正在搜索: {keyword}..."
+msgstr "Searching: {keyword}..."
 
-msgid "🚫 无法解析影片ID，尝试修改文件名后重试"
-msgstr "🚫 Failed to parse movie ID, rename file and try again"
+msgid "无法解析影片ID，尝试修改文件名后重试"
+msgstr "Failed to parse movie ID, rename file and try again"
 
 msgid "处理 "
 msgstr "Processing "
@@ -153,14 +149,14 @@ msgstr "Processing "
 msgid "正在搜索影片"
 msgstr "Searching movie"
 
-msgid "🚫 未找到匹配的影片"
-msgstr "🚫 No matching movie found"
+msgid "未找到匹配的影片"
+msgstr "No matching movie found"
 
 msgid "正在获取影片详情"
 msgstr "Getting movie details"
 
-msgid "🚫 无法获取影片详情"
-msgstr "🚫 Failed to get movie details"
+msgid "无法获取影片详情"
+msgstr "Failed to get movie details"
 
 msgid "正在创建影片目录"
 msgstr "Creating movie directory"
@@ -177,8 +173,8 @@ msgstr "Downloading cover"
 msgid "和剧照"
 msgstr "and stills"
 
-msgid "🚫 封面图片下载失败"
-msgstr "🚫 Failed to download cover image"
+msgid "封面图片下载失败"
+msgstr "Failed to download cover image"
 
 msgid "正在生成 NFO 文件"
 msgstr "Generating NFO file"
@@ -186,14 +182,14 @@ msgstr "Generating NFO file"
 msgid "正在移动影片文件"
 msgstr "Moving movie file"
 
-msgid "✅ 影片相关文件已保存至: "
-msgstr "✅ Movie-related files saved to: "
+msgid "影片相关文件已保存至: "
+msgstr "Movie-related files saved to: "
 
 #, python-brace-format
 msgid "处理完成，共搜索整理 {count} 部影片，其中 {failed} 部影片获取信息失败"
 msgstr ""
-"Process completed, {count} movie(s) have been searched, among which "
-"{failed} movie(s) failed"
+"Process completed, {count} movie(s) have been searched, among which {failed} "
+"movie(s) failed"
 
 msgid "获取信息失败的影片文件:"
 msgstr "Movie files failed to get info:"
@@ -201,8 +197,9 @@ msgstr "Movie files failed to get info:"
 msgid "已忽略的影片文件:"
 msgstr "Ignored movie file(s):"
 
-msgid "🚫 actress_alias.json 文件为空或不存在，无法执行整理操作"
-msgstr "🚫 actress_alias.json is missing or empty, unable to organize movie folder"
+msgid "actress_alias.json 文件为空或不存在，无法执行整理操作"
+msgstr ""
+"actress_alias.json is missing or empty, unable to organize movie folder"
 
 #, python-brace-format
 msgid "发现 {count} 个影片文件:"
@@ -218,4 +215,3 @@ msgstr "and its subfolders"
 #, python-brace-format
 msgid "发现 {count} 个影片关键词:"
 msgstr "Found {count} movie keyword(s):"
-
