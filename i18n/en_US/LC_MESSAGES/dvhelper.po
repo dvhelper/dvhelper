@@ -11,22 +11,23 @@ msgstr ""
 "\n"
 "  Searching for movie information, download cover, stills images, also "
 "trailers, generate NFO files.\n"
-"  Organize movies by actresses, and support online movie information search "
-"as well as batch processing of local movie directories."
+"  Organize movies by actresses, and support online movie information "
+"search as well as batch processing of local movie directories."
 
 msgid ""
 "搜索关键词（如影片编号）或本地影片目录路径\n"
 "可以使用逗号分隔多个关键词，或指定一个包含影片文件的目录进行批量处理"
 msgstr ""
-"search for keywords (e.g., movie ID) or the directory path of local movies\n"
+"search for keywords (e.g., movie ID) or the directory path of local "
+"movies\n"
 "multiple keywords can be separated by commas\n"
 "or a directory containing movie files can be specified"
 
 #, python-format
 msgid "目录搜索深度（默认: %(default)s，表示仅搜索当前目录）"
 msgstr ""
-"directory search depth (Default: %(default)s, only the current directory is "
-"searched)"
+"directory search depth (Default: %(default)s, only the current directory "
+"is searched)"
 
 msgid "下载影片剧照和预告片"
 msgstr "download movie stills and trailers"
@@ -118,11 +119,13 @@ msgstr "Failed to delete source folder: "
 
 msgid "保留源视频并删除目标文件夹同名文件: "
 msgstr ""
-"Keep source movie and delete file with the same name in the target folder: "
+"Keep source movie and delete file with the same name in the target "
+"folder: "
 
 msgid "保留目标视频并删除源文件夹同名文件: "
 msgstr ""
-"Keep target movie and delete file with the same name in the source folder: "
+"Keep target movie and delete file with the same name in the source "
+"folder: "
 
 msgid "已移动视频文件: "
 msgstr "Movie file moved: "
@@ -188,8 +191,8 @@ msgstr "Movie-related files saved to: "
 #, python-brace-format
 msgid "处理完成，共搜索整理 {count} 部影片，其中 {failed} 部影片获取信息失败"
 msgstr ""
-"Process completed, {count} movie(s) have been searched, among which {failed} "
-"movie(s) failed"
+"Process completed, {count} movie(s) have been searched, among which "
+"{failed} movie(s) failed"
 
 msgid "获取信息失败的影片文件:"
 msgstr "Movie files failed to get info:"
@@ -198,8 +201,7 @@ msgid "已忽略的影片文件:"
 msgstr "Ignored movie file(s):"
 
 msgid "actress_alias.json 文件为空或不存在，无法执行整理操作"
-msgstr ""
-"actress_alias.json is missing or empty, unable to organize movie folder"
+msgstr "actress_alias.json is missing or empty, unable to organize movie folder"
 
 #, python-brace-format
 msgid "发现 {count} 个影片文件:"
@@ -215,3 +217,4 @@ msgstr "and its subfolders"
 #, python-brace-format
 msgid "发现 {count} 个影片关键词:"
 msgstr "Found {count} movie keyword(s):"
+
