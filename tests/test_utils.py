@@ -7,6 +7,7 @@ import logging
 from unittest.mock import patch, MagicMock
 import dvhelper
 from dvhelper import set_language, get_logger, TqdmOut, HelpOnErrorParser
+from colorama import Fore, Style
 
 # 确保可以导入被测试模块
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -89,7 +90,7 @@ def test_help_on_error_parser():
 					pass
 				
 				# 验证sys.stderr.write被正确调用
-				mock_write.assert_called_with("🚫 错误: test error\n")
+				mock_write.assert_called_with(f'{Style.BRIGHT}{Fore.RED}' + '错误: test error' + f'{Style.RESET_ALL}\n\n')
 				
 				# 验证print_help被正确调用
 				mock_print_help.assert_called()
