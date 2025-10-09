@@ -33,7 +33,7 @@ sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 #endregion
 
 
-__version__ = '0.0.9'
+__version__ = '0.0.9.1'
 __version_info__ = tuple(int(x) for x in __version__.split('.'))
 
 
