@@ -72,8 +72,8 @@ msgstr "User login failed"
 msgid "第 {retry}/{retries} 次尝试（超时时间: {timeout} 秒）"
 msgstr "Attempt {retry}/{retries} (Timeout: {timeout} seconds)"
 
-msgid "媒体文件: "
-msgstr "Media File: "
+msgid "媒体文件 - "
+msgstr "Media File - "
 
 msgid "未发现需要整理的影片文件夹"
 msgstr "No movie folders requiring organization found"
@@ -174,7 +174,7 @@ msgid "正在下载封面"
 msgstr "Downloading cover"
 
 msgid "和剧照"
-msgstr "and stills"
+msgstr " and stills"
 
 msgid "封面图片下载失败"
 msgstr "Failed to download cover image"
