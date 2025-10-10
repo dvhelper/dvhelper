@@ -600,7 +600,7 @@ class MovieScraper():
 
 				media_file = movie_path / media_file
 				with open(media_file, 'wb') as f:
-					with tqdm(total=total_size, unit='B', unit_scale=True, desc=_('媒体文件: ') + media_file.name, leave=False, ncols=80, bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt}') as pbar:
+					with tqdm(total=total_size, unit='B', unit_scale=True, desc=_('媒体文件 - ') + media_file.name, leave=False, ncols=80, bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt}') as pbar:
 						for chunk in response.iter_content(chunk_size=chunk_size):
 							if chunk:
 								f.write(chunk)
@@ -1112,35 +1112,38 @@ def main():
 		with open(config.actress_alias_file, 'r', encoding='utf-8') as file:
 			config.actress_alias = json.load(file)
 
-	if Path(keywords_or_path).absolute().is_dir():
-		root_dir = Path(keywords_or_path)
+	try:
+		if Path(keywords_or_path).absolute().is_dir():
+			root_dir = Path(keywords_or_path)
 
-		if any(arg in unknown_args for arg in ['-o', '--organize']):
-			if not config.actress_alias:
-				logger.warning(_('actress_alias.json 文件为空或不存在，无法执行整理操作'))
+			if any(arg in unknown_args for arg in ['-o', '--organize']):
+				if not config.actress_alias:
+					logger.warning(_('actress_alias.json 文件为空或不存在，无法执行整理操作'))
+				else:
+					dv_helper.organize_folders(root_dir)
+				return
+
+			found_files = dv_helper.list_video_files(root_dir, max_depth=args.depth)
+
+			if found_files:
+				logger.info(_('发现 {count} 个影片文件:').format(count=len(found_files)))
+				for index, file_path in enumerate(found_files, 1):
+					print(f'    {index}.{Path(file_path).relative_to(root_dir)}')
+
+				dv_helper.batch_process(found_files, gallery=args.gallery, dir_mode=True, root_dir=root_dir)
 			else:
-				dv_helper.organize_folders(root_dir)
-			return
-
-		found_files = dv_helper.list_video_files(root_dir, max_depth=args.depth)
-
-		if found_files:
-			logger.info(_('发现 {count} 个影片文件:').format(count=len(found_files)))
-			for index, file_path in enumerate(found_files, 1):
-				print(f'    {index}.{Path(file_path).relative_to(root_dir)}')
-
-			dv_helper.batch_process(found_files, gallery=args.gallery, dir_mode=True, root_dir=root_dir)
+				logger.info(_('在 {root_dir} {else_part}中未发现影片文件')
+					.format(root_dir=root_dir, else_part=_('及其子目录') if args.depth > 0 else ''))
 		else:
-			logger.info(_('在 {root_dir} {else_part}中未发现影片文件')
-				.format(root_dir=root_dir, else_part=_('及其子目录') if args.depth > 0 else ''))
-	else:
-		keywords = [keyword.strip() for keyword in keywords_or_path.split(',')]
+			keywords = [keyword.strip() for keyword in keywords_or_path.split(',')]
 
-		logger.info(_('发现 {count} 个影片关键词:').format(count=len(keywords)))
-		for index, keyword in enumerate(keywords, 1):
-			print(f'    {index}.{keyword}')
+			logger.info(_('发现 {count} 个影片关键词:').format(count=len(keywords)))
+			for index, keyword in enumerate(keywords, 1):
+				print(f'    {index}.{keyword}')
 
-		dv_helper.batch_process(keywords, gallery=args.gallery)
+			dv_helper.batch_process(keywords, gallery=args.gallery)
+	except KeyboardInterrupt:
+		sys.exit(0)
 
 
 if __name__ == '__main__':
