@@ -1,4 +1,9 @@
 # -*- coding: utf-8 -*-
+"""
+This file is part of the DV Helper project, https://github.com/dvhelper/dvhelper
+The MIT License (MIT)
+Copyright © 2025 Walkline Wang <walkline@gmail.com>
+"""
 #region Imports
 # 标准库导入
 import os
