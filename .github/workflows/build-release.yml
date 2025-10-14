@@ -1,132 +1,132 @@
-name: Build and Release DV Helper
+name: Build and Release DV-Helper
 
 on:
   push:
     tags:
       - 'v*'
-  workflow_dispatch:  # 允许手动触发
+  workflow_dispatch:
     inputs:
       tag_name:
-        description: '可选的标签名称，如果不提供则使用默认值'
+        description: 'Tag name (uses default if not provided)'
         required: false
         type: string
 
 jobs:
   build:
-    runs-on: windows-latest
-    permissions:
-      contents: write  # 允许创建release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, windows-latest]
+        python-version: ['3.13']
     env:
       PYTHONIOENCODING: "utf-8"
-      PYTEST_ADDOPTS: "-rA --color=yes --tb=long --showlocals"
+      TAG_NAME: ${{ inputs.tag_name || github.ref_name }}
 
     steps:
-      # 1. 检出代码仓库
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
-          fetch-depth: 0  # 检出所有历史记录，包括tags
+          fetch-depth: 0 # Checkout commit history including tags
 
-      # 2. 设置Python环境
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
-          python-version: '3.12'
-          architecture: 'x64'
+          python-version: ${{ matrix.python-version }}
           cache: 'pip'
 
-      # 3. 缓存Poetry依赖并安装项目依赖
-      - name: Cache poetry dependencies
+      - name: Set up project dependencies
+        run: |
+          # Install poetry
+          python -m pip install --upgrade pip
+          pip install poetry
+
+          # Set up poetry
+          poetry config virtualenvs.in-project true
+          poetry config cache-dir .cache/pypoetry
+
+          # Install project dependencies
+          poetry install
+
+      - name: Cache project dependencies
         uses: actions/cache@v4
-        id: cache-poetry
         with:
           path: |
-            ~\AppData\Local\pypoetry\Cache
-            **\.venv
-            **\poetry.lock
+            **/.cache/pypoetry
+            **/.venv
+            **/poetry.lock
           key: ${{ runner.os }}-python-${{ steps.setup-python.outputs.python-version }}-poetry-${{ hashFiles('**/poetry.lock') }}
           restore-keys: |
             ${{ runner.os }}-python-${{ steps.setup-python.outputs.python-version }}-poetry-
         continue-on-error: true
 
-      - name: Install project dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install poetry
-          poetry lock
-          poetry install
-
-      # 4. 更新可执行文件版本号并编译i18n二进制文件
-      - name: Update executable file version
-        run: |
-          poetry run python .\make\update_version.py
-
-      - name: Compile i18n binary files
-        run: |
-          & .\i18n\make.bat 1
-          & .\i18n\make.bat 3
-
-      # 5. 使用pyinstaller打包项目
-      - name: Build executable with PyInstaller
-        run: |
-          poetry run pyinstaller --clean --noconfirm make\dvhelper.spec
-
-      # 6. 复制actress_alias.json文件到dist目录
-      - name: Copy actress_alias.json to dist
-        run: |
-          Copy-Item -Path actress_alias.json -Destination dist\actress_alias.json
-
-      # 7. 压缩dist目录为zip文件
-      - name: Create release archive
-        id: create_archive
-        run: |
-          # 确定标签名称，优先使用手动输入，否则使用环境变量
-          $TAG_NAME = if (-not [string]::IsNullOrEmpty("${{ inputs.tag_name }}")) {
-            "${{ inputs.tag_name }}"
-          } else {
-            $env:GITHUB_REF_NAME
-          }
-          
-          # 验证标签有效性，如果无效则使用默认值
-          if ([string]::IsNullOrEmpty($TAG_NAME) -or $TAG_NAME -eq 'main' -or $TAG_NAME -eq 'master') {
-            $TAG_NAME = "dev-build-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
-          }
-          
-          $ZIP_NAME = "dvhelper-${TAG_NAME}.zip"
-          Compress-Archive -Path dist\* -DestinationPath $ZIP_NAME
-          echo "archive_name=${ZIP_NAME}" >> $env:GITHUB_OUTPUT
-          echo "tag_name=${TAG_NAME}" >> $env:GITHUB_OUTPUT
-
-      # 8. 获取详细的提交历史并设置为输出
-      - name: Get detailed commit history
-        id: get_commits
+      - name: Build executable file
         shell: pwsh
         run: |
-          # 获取当前标签名称
-          $CURRENT_TAG = "${{ steps.create_archive.outputs.tag_name }}"
-          Write-Host "执行提交历史获取脚本，当前标签: $CURRENT_TAG"
-          
-          # 调用外部脚本并传递当前标签作为参数
-          Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
-          .\make\get_commit_history.ps1 -TagName $CURRENT_TAG
+          # Update executable file version
+          poetry run python ./make/update_version.py
 
-      # 9. 创建GitHub Release并上传压缩包
+          # Compile i18n binary files
+          poetry run python ./i18n/make.py compile
+
+          # Build executable file
+          poetry run pyinstaller --clean --noconfirm ./make/dvhelper.spec
+
+          # Copy actress_alias.json to dist/
+          Copy-Item -Path actress_alias.json -Destination dist/actress_alias.json
+
+      - name: Create release archive
+        id: create_archive
+        shell: pwsh
+        run: |
+          $ARCHIVE_NAME = "dvhelper-${{ matrix.os }}-${{ env.TAG_NAME }}.zip"
+          Compress-Archive -Path dist/* -DestinationPath $ARCHIVE_NAME
+          echo "ARCHIVE_NAME=${ARCHIVE_NAME}" >> $env:GITHUB_ENV
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts-${{ matrix.os }}
+          path: ${{ env.ARCHIVE_NAME }}
+          if-no-files-found: error
+
+  release:
+    runs-on: windows-latest
+    needs: build
+    permissions:
+      contents: write  # Allow write permissions to create releases
+    env:
+      PYTHONIOENCODING: "utf-8"
+      TAG_NAME: ${{ inputs.tag_name || github.ref_name }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # Checkout commit history including tags
+
+      - name: Get commit history
+        run: |
+          Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+          ./make/get_commit_history.ps1 -TagName ${{ env.TAG_NAME }}
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ steps.create_archive.outputs.archive_name }}
-          name: Release ${{ steps.create_archive.outputs.tag_name }}
-          # 使用环境变量引用提交历史
+          files: artifacts/*
+          name: ${{ env.TAG_NAME }}
+          tag_name: ${{ env.TAG_NAME }}
+          overwrite_files: true
+          generate_release_notes: false
           body: |
             ## 更新内容
             
             ${{ env.commits }}
-            
-          # 不使用GitHub自动生成的release notes
-          generate_release_notes: false
-          # 使用从create_archive步骤获取的标签名称
-          tag_name: ${{ steps.create_archive.outputs.tag_name }}
-          # 允许覆盖已存在的文件
-          overwrite_files: true
+
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
