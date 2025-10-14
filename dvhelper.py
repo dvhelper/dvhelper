@@ -941,7 +941,7 @@ class DVHelper(MovieScraper):
 				else:
 					dir1 = _('==多演员==')
 
-				base_dir = (Path(root_dir) if dir_mode else Path(os.getcwd())) / config.completed_path
+				base_dir = (Path(root_dir) if dir_mode else Path.cwd()) / config.completed_path
 				movie_path = base_dir / dir1 / f'[{movie_info.number}]({movie_info.year})'
 				movie_path.mkdir(parents=True, exist_ok=True)
 				step_pbar.update()

@@ -1,19 +1,19 @@
 # -*- mode: python ; coding: utf-8 -*-
-import os
+from pathlib import Path
 import glob
 
 
 def find_mo_files():
 	mo_files = []
 	for mo_file in glob.glob('i18n/**/*.mo', recursive=True):
-		dest_path = os.path.dirname(mo_file)
-		file_path = os.path.join('..', mo_file)
+		dest_path = str(Path(mo_file).parent)
+		file_path = str(Path('..') / mo_file)
 		mo_files.append((file_path, dest_path))
 
 	return mo_files
 
 a = Analysis(
-	[os.path.join('..', 'dvhelper.py')],
+	[str(Path('..') / 'dvhelper.py')],
 	pathex=[],
 	binaries=[],
 	datas=find_mo_files(),
