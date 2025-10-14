@@ -2,7 +2,7 @@
 
 # DV Helper
 
-<img src="https://img.shields.io/badge/Licence-MIT-green.svg?style=for-the-badge&&logo=github" />  <img src="https://img.shields.io/badge/Python-3.10%2B-blue.svg?style=for-the-badge&logo=python" />  <img src="https://img.shields.io/badge/Windows-OS-red.svg?style=for-the-badge&logo=windows" />
+<img src="https://img.shields.io/badge/Licence-MIT-green.svg?style=for-the-badge&&logo=github" />  <img src="https://img.shields.io/badge/Python-3.10%2B-blue.svg?style=for-the-badge&logo=python" />  <img src="https://img.shields.io/badge/Windows-OS-red.svg?style=for-the-badge&logo=windows" />  <img src="https://img.shields.io/badge/Linux-OS-lightgrey.svg?style=for-the-badge&logo=linux" />
 
 **DV Helper** 是一款影片信息搜索和整理工具，能够从网站抓取影片信息，下载封面图片、剧照、预告片，生成标准的NFO文件，并按照演员分类整理影片文件。
 
@@ -122,7 +122,7 @@ cd dvhelper
 
 ```bash
 pip install -e .
-i18n\make.bat 3
+python i18n/make.py compile
 dvhelper
 dvhelper . -o --lang
 ```
@@ -133,7 +133,7 @@ dvhelper . -o --lang
 
 ```bash
 poetry install
-i18n\make.bat 3
+poetry run python i18n/make.py compile
 poetry run python dvhelper.py
 poetry run python dvhelper.py . -o --lang
 ```
@@ -154,12 +154,12 @@ DV-Helper支持多语言国际化，使用gettext和Babel工具进行翻译管�
 
 #### 更新翻译文件
 
-项目提供了`i18n/make.bat`批处理文件来管理翻译流程：
+项目提供了`i18n/make.py`脚本来管理翻译流程：
 
-1. 更新pot文件和po文件
+1. 更新`.pot`文件和`.po`文件
    ```bash
    # 在项目根目录下执行
-   call i18n\make.bat 1
+   python i18n/make.py update
    ```
    此命令会：
    - 从源代码中提取所有需要翻译的字符串，更新`i18n/dvhelper.pot`文件
@@ -168,26 +168,26 @@ DV-Helper支持多语言国际化，使用gettext和Babel工具进行翻译管�
 2. 初始化新的翻译
    ```bash
    # 在项目根目录下执行
-   call i18n\make.bat 2 ja_JP
+   python i18n/make.py create ja_JP
    ```
    此命令会：
-   - 提取字符串并创建pot文件
-   - 基于pot文件初始化新的po文件（如果不存在）
+   - 提取字符串并创建`.pot`文件
+   - 基于`.pot`文件初始化新的`.po`文件（如果不存在）
 
-3. 编译mo文件
+3. 编译`.mo`文件
    ```bash
    # 在项目根目录下执行
-   call i18n\make.bat 3
+   python i18n/make.py compile
    ```
    此命令会：
-   - 将po文件编译成二进制的mo文件
-   - 编译后的mo文件位于`i18n/<locale>/LC_MESSAGES/dvhelper.mo`
+   - 将`.po`文件编译成二进制的`.mo`文件
+   - 编译后的`.mo`文件位于`i18n/<locale>/LC_MESSAGES/dvhelper.mo`
 
 #### 编辑翻译文件
 
-- 要编辑翻译，您需要修改`i18n/en_US/LC_MESSAGES/dvhelper.po`文件
+- 要编辑翻译，您需要修改`i18n/<locale>/LC_MESSAGES/dvhelper.po`文件
 - 可以使用任何文本编辑器或专门的PO文件编辑器（如Poedit）进行编辑
-- 编辑完成后，需要执行编译命令生成mo文件，程序才能使用新的翻译
+- 编辑完成后，需要执行编译命令生成`.mo`文件，程序才能使用新的翻译
 
 ## 工作原理
 
