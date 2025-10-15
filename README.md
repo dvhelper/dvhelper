@@ -2,7 +2,7 @@
 
 # DV Helper
 
-<img src="https://img.shields.io/badge/Licence-MIT-green.svg?style=for-the-badge&&logo=github" />  <img src="https://img.shields.io/badge/Python-3.10%2B-blue.svg?style=for-the-badge&logo=python" />  <img src="https://img.shields.io/badge/Windows-OS-red.svg?style=for-the-badge&logo=windows" />  <img src="https://img.shields.io/badge/Linux-OS-lightgrey.svg?style=for-the-badge&logo=linux" />
+<img src="https://img.shields.io/badge/Licence-MIT-green.svg?logo=github" />  <img src="https://img.shields.io/badge/Python-3.10%2B-blue.svg?logo=python" />  <img src="https://img.shields.io/badge/Windows-OS-red.svg?logo=windows" />  <img src="https://img.shields.io/badge/Linux-OS-red.svg?logo=linux" />  [![codecov](https://codecov.io/gh/dvhelper/dvhelper/graph/badge.svg?token=44BJ5SYMB7)](https://codecov.io/gh/dvhelper/dvhelper)
 
 **DV Helper** 是一款影片信息搜索和整理工具，能够从网站抓取影片信息，下载封面图片、剧照、预告片，生成标准的NFO文件，并按照演员分类整理影片文件。
 
