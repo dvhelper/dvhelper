@@ -45,7 +45,7 @@ __version_info__ = tuple(int(x) for x in __version__.split('.'))
 def set_language(lang: str = 'zh_CN'):
 	gettext.install('dvhelper')
 
-	i18n_dir = Path(__file__).parent.joinpath('i18n')
+	i18n_dir = Path(__file__).parent / 'i18n'
 	if not i18n_dir.exists():
 		return
 
@@ -71,8 +71,8 @@ class Config:
 	#region File & Path names
 	fanart_image:        str = 'fanart.jpg'
 	poster_image:        str = 'poster.jpg'
-	cookies_file:       Path = Path(__file__).parent.joinpath('cookies.json')
-	actress_alias_file: Path = Path(__file__).parent.joinpath('actress_alias.json')
+	cookies_file:       Path = Path(__file__).parent / 'cookies.json'
+	actress_alias_file: Path = Path(__file__).parent / 'actress_alias.json'
 	completed_path:      str = _('#整理完成#')
 	ignored_file_prefix: str = '##'
 	exclude_path: tuple[str] = (
@@ -941,7 +941,7 @@ class DVHelper(MovieScraper):
 				else:
 					dir1 = _('==多演员==')
 
-				base_dir = (Path(root_dir) if dir_mode else Path(os.getcwd())) / config.completed_path
+				base_dir = (Path(root_dir) if dir_mode else Path.cwd()) / config.completed_path
 				movie_path = base_dir / dir1 / f'[{movie_info.number}]({movie_info.year})'
 				movie_path.mkdir(parents=True, exist_ok=True)
 				step_pbar.update()
@@ -1076,8 +1076,8 @@ def main():
 
 	if getattr(sys, 'frozen', False):
 		current_dir = Path(sys.executable).parent
-		config.actress_alias_file = current_dir.joinpath('actress_alias.json')
-		config.cookies_file = current_dir.joinpath('cookies.json')
+		config.actress_alias_file = current_dir / 'actress_alias.json'
+		config.cookies_file = current_dir / 'cookies.json'
 
 	parser = HelpOnErrorParser(
 		description=config.description,
