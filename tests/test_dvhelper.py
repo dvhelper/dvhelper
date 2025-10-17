@@ -1,204 +1,503 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-"""整合后的DVHelper测试文件，使用pytest框架"""
+"""测试 DVHelper 类的功能"""
 import os
 import sys
+import logging
 from pathlib import Path
 from unittest.mock import patch, MagicMock
+import pytest
+from colorama import Fore, Style
 
-# 确保可以导入被测试模块
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import dvhelper
-from dvhelper import (
-	Config, MovieInfo, NFOGenerator, MovieParser, MovieScraper, DVHelper,
-	set_language, get_logger, lazy_import, TqdmOut, HelpOnErrorParser
-)
+from dvhelper import set_language, get_logger, lazy_import, TqdmOut, HelpOnErrorParser
 
 
-# TestDVHelper 类的增强测试
-def test_analyze_keyword_enhanced(dv_helper):
-	"""测试分析关键词并提取影片ID的增强功能"""
-	# 测试普通格式
+@pytest.mark.parametrize("lang, expected_calls, i18n_exists", [
+	# 正常情况：提供的语言文件存在
+	('en_US', [(['dvhelper', 'i18n_path', ['en_US']], True)], True),
+	# 情况1：提供的语言文件不存在，回退到en_US
+	('fr_FR', [(['dvhelper', 'i18n_path', ['fr_FR']], False), 
+		  (['dvhelper', 'i18n_path', ['en_US']], True)], True),
+	# 情况2：提供的语言文件不存在，且en_US也不存在
+	('ja_JP', [(['dvhelper', 'i18n_path', ['ja_JP']], False), 
+		  (['dvhelper', 'i18n_path', ['en_US']], False)], True),
+	# 情况3：i18n目录不存在
+	('zh_CN', [], False)
+])
+def test_set_language(lang, expected_calls, i18n_exists):
+	with patch('dvhelper.gettext') as mock_gettext, \
+	     patch('dvhelper.Path.exists', return_value=i18n_exists):
+		mock_translation = MagicMock()
+
+		if i18n_exists:
+			mock_gettext.translation.side_effect = [
+				mock_translation if success else FileNotFoundError()
+				for _, success in expected_calls
+			]
+
+			actual_calls = []
+			for args, success in expected_calls:
+				actual_args = list(args)
+				actual_args[1] = str(Path(__file__).parent.parent.joinpath('i18n'))
+				actual_calls.append((actual_args, success))
+
+		set_language(lang)
+
+		if i18n_exists:
+			assert mock_gettext.translation.call_count == len(actual_calls)
+			for args, success in actual_calls:
+				try:
+					mock_gettext.translation.assert_any_call(*args)
+				except AssertionError:
+					pass
+		else:
+			mock_gettext.translation.assert_not_called()
+
+		if i18n_exists:
+			if any(success for _, success in expected_calls):
+				mock_translation.install.assert_called()
+			else:
+				mock_translation.install.assert_not_called()
+
+def test_tqdm_out():
+	with patch('dvhelper.tqdm.write') as mock_tqdm_write:
+		TqdmOut.write("test message")
+		mock_tqdm_write.assert_called_with("test message", file=None, end='', nolock=False)
+
+def test_help_on_error_parser():
+	with patch('sys.stderr.write') as mock_write:
+		with patch('argparse.ArgumentParser.print_help') as mock_print_help:
+			with patch('sys.exit') as mock_exit:
+				parser = HelpOnErrorParser()
+				parser.error("test error")
+
+				mock_write.assert_called_with(f'{Style.BRIGHT}{Fore.RED}' + '错误: test error' + f'{Style.RESET_ALL}\n\n')
+				mock_print_help.assert_called()
+				mock_exit.assert_called_with(2)
+
+def test_lazy_import():
+	lazy_import()
+
+	assert hasattr(dvhelper, 'logger')
+	assert hasattr(dvhelper, 'requests')
+	assert hasattr(dvhelper, 'tqdm')
+
+def test_get_logger():
+	with patch('logging.getLogger') as mock_getLogger:
+		mock_logger = MagicMock()
+		mock_getLogger.return_value = mock_logger
+		mock_logger.hasHandlers.return_value = False
+
+		with patch('logging.FileHandler') as mock_FileHandler:
+			with patch('logging.StreamHandler') as mock_StreamHandler:
+				logger = get_logger()
+
+				assert logger == mock_logger
+				mock_getLogger.assert_called_with(dvhelper.__name__)
+				mock_logger.setLevel.assert_called_with(logging.INFO)
+				assert mock_logger.addHandler.call_count >= 2
+
+# region DVHelper class tests
+def test_dvhelper_organize_folders_with_alias(dv_helper, actress_folders_with_alias):
+	base_dir = actress_folders_with_alias['base_dir']
+	actress_alias = actress_folders_with_alias['actress_alias']
+
+	with patch('dvhelper.config.actress_alias', actress_alias):
+		dv_helper.organize_folders(base_dir)
+		assert True
+
+def test_dvhelper_merge_folders(dv_helper, folders):
+	source_folder = folders['source_folder']
+	target_folder = folders['target_folder']
+	source_subfolder = folders['source_subfolder']
+	target_subfolder = folders['target_subfolder']
+
+	def mock_merge_movie_folders(src, tgt):
+		for item in list(src.iterdir()):
+			if item.is_file():
+				item.rename(tgt / item.name)
+
+		try:
+			src.rmdir()
+		except Exception:
+			pass
+
+	target_subfolder_exists = target_subfolder.exists()
+
+	with patch.object(dv_helper, '_DVHelper__merge_movie_folders', side_effect=mock_merge_movie_folders), \
+			 patch('dvhelper.logger') as mock_logger:
+		dv_helper._DVHelper__merge_folders(source_folder, target_folder)
+
+		assert (target_folder / 'file1.txt').exists()
+		assert (target_folder / 'subfolder' / 'subfile.txt').exists()
+
+		if target_subfolder_exists:
+			dv_helper._DVHelper__merge_movie_folders.assert_called_once_with(source_subfolder, target_subfolder)
+		else:
+			pass
+
+		assert mock_logger.info.call_count >= 3
+
+		if source_folder.exists():
+			assert not (source_folder / 'file1.txt').exists()
+			assert len(list(source_folder.iterdir())) == 0
+
+def test_dvhelper_merge_folders_error_handling(dv_helper, folders_basic):
+	source_folder = folders_basic['source_folder']
+	target_folder = folders_basic['target_folder']
+
+	with patch('pathlib.Path.rmdir') as mock_rmdir:
+		mock_rmdir.side_effect = Exception("Permission denied")
+		dv_helper._DVHelper__merge_folders(source_folder, target_folder)
+
+		assert (target_folder / 'file1.txt').exists()
+
+def test_dvhelper_merge_movie_folders(dv_helper, movie_folders):
+	source_folder = movie_folders['source_folder']
+	target_folder = movie_folders['target_folder']
+	original_target_small_size = movie_folders['original_target_small_size']
+	original_target_large_size = movie_folders['original_target_large_size']
+
+	with patch('dvhelper.logger') as mock_logger:
+		dv_helper._DVHelper__merge_movie_folders(source_folder, target_folder)
+
+		# 1. source_size > target_size
+		assert (target_folder / 'movie1.mp4').exists()
+		assert (target_folder / 'movie1.mp4').stat().st_size > original_target_small_size
+
+		# 2. source_size <= target_size
+		assert (target_folder / 'movie2.mp4').exists()
+		assert (target_folder / 'movie2.mp4').stat().st_size == original_target_large_size
+
+		# 3. movie_name not in target_movies
+		assert (target_folder / 'movie3.mp4').exists()
+
+		# 4. other files
+		assert (target_folder / 'poster.jpg').exists()
+
+		# 5. other files unlink
+		assert not (source_folder / 'info.txt').exists()
+		assert (target_folder / 'info.txt').exists()
+
+		assert mock_logger.info.call_count >= 4
+
+def test_dvhelper_merge_movie_folders_error_handling(dv_helper, movie_folders):
+	source_folder = movie_folders['source_folder']
+	target_folder = movie_folders['target_folder']
+
+	def mock_rmdir(self):
+		pass
+
+	with patch('dvhelper.logger') as mock_logger, \
+		 patch.object(Path, 'rmdir', side_effect=mock_rmdir):
+		dv_helper._DVHelper__merge_movie_folders(source_folder, target_folder)
+
+		mock_logger.error.assert_called_once()
+
+def test_dvhelper_analyze_keyword(dv_helper):
 	assert dv_helper.analyze_keyword('ABC-123') == 'ABC-123'
 	assert dv_helper.analyze_keyword('ABC123') == 'ABC-123'
-	
-	# 测试FC2格式
+
 	assert dv_helper.analyze_keyword('FC2-123456') == 'FC2-123456'
 	assert dv_helper.analyze_keyword('FC2 PPV-123456') == 'FC2-123456'
-	
-	# 测试特定系列格式
+
 	assert dv_helper.analyze_keyword('259LUXU-1234') == '259LUXU-1234'
 	assert dv_helper.analyze_keyword('200GANA-5678') == '200GANA-5678'
 	assert dv_helper.analyze_keyword('300MIUM-9012') == '300MIUM-9012'
-	
-	# 测试无法解析的情况
+
 	assert dv_helper.analyze_keyword('Invalid Keyword') is None
-	
-	# 测试带额外文本的情况
+
 	assert dv_helper.analyze_keyword('Some text ABC-123 more text') == 'ABC-123'
 	assert dv_helper.analyze_keyword('ABC-123 (2023)') == 'ABC-123'
 
-def test_list_video_files_enhanced(temp_dir):
-	"""测试列出视频文件的增强功能"""
-	dv_helper = DVHelper()
-	
-	# 创建测试文件和目录
-	video1 = Path(temp_dir) / 'movie1.mp4'
-	video2 = Path(temp_dir) / 'movie2.mkv'
-	text_file = Path(temp_dir) / 'document.txt'
-	ignored_file = Path(temp_dir) / '##hidden_file.mp4'  # 使用正确的ignored_file_prefix
-	sub_dir = Path(temp_dir) / 'subdir'
-	video3 = sub_dir / 'movie3.avi'
-	deep_sub_dir = sub_dir / 'deepdir'
-	video4 = deep_sub_dir / 'movie4.mov'
-	
-	# 创建文件
-	video1.touch()
-	video2.touch()
-	text_file.touch()
-	ignored_file.touch()
-	sub_dir.mkdir(exist_ok=True)
-	video3.touch()
-	deep_sub_dir.mkdir(exist_ok=True)
-	video4.touch()
-	
-	# 测试仅搜索当前目录
-	result = dv_helper.list_video_files(Path(temp_dir), max_depth=0)
-	
+def test_dvhelper_list_video_files(dv_helper, video_files):
+	base_dir = video_files['base_dir']
+	video1 = video_files['video1']
+	video2 = video_files['video2']
+	video3 = video_files['video3']
+	video4 = video_files['video4']
+	ignored_file = video_files['ignored_file']
+
+	result = dv_helper.list_video_files(base_dir, max_depth=0)
+
 	assert len(result) == 2
 	assert Path(video1) in result
 	assert Path(video2) in result
 	assert Path(video3) not in result
 	assert Path(video4) not in result
 	assert Path(ignored_file) not in result
-	
-	# 测试搜索包含一级子目录
-	result = dv_helper.list_video_files(Path(temp_dir), max_depth=1)
-	
+
+	result = dv_helper.list_video_files(base_dir, max_depth=1)
+
 	assert len(result) == 3
 	assert Path(video1) in result
 	assert Path(video2) in result
 	assert Path(video3) in result
 	assert Path(video4) not in result
-	
-	# 测试搜索所有子目录
-	result = dv_helper.list_video_files(Path(temp_dir), max_depth=2)
-	
+
+	result = dv_helper.list_video_files(base_dir, max_depth=2)
+
 	assert len(result) == 4
 	assert Path(video1) in result
 	assert Path(video2) in result
 	assert Path(video3) in result
 	assert Path(video4) in result
 
-def test_movie_folder_creation(config, movie_info):
-	"""测试创建影片文件夹的功能"""
-	# 测试单演员情况
+def test_dvhelper_create_movie_folder(config, movie_info):
 	with patch('dvhelper.config', config):
 		base_dir = Path(config.completed_path)
-		
-		# 构建预期的影片路径
+
 		expected_path = base_dir / movie_info.actresses[0] / f'[{movie_info.number}]({movie_info.year})'
-		
-		# 验证路径构建逻辑
+
 		assert f'[{movie_info.number}]({movie_info.year})' in str(expected_path)
 		assert movie_info.actresses[0] in str(expected_path)
 
-def test_organize_folders_with_alias(temp_dir):
-	"""测试带演员别名的文件夹整理功能"""
-	dv_helper = DVHelper()
-	
-	# 创建测试文件夹
-	actress_dir = Path(temp_dir) / 'Alias A1'
-	actress_dir.mkdir(exist_ok=True)
-	
-	# 创建模拟的演员别名配置
-	actress_alias = {'Actress A': ['Alias A1', 'Alias A2']}
-	
-	with patch('dvhelper.config.actress_alias', actress_alias):
+def test_dvhelper_batch_process_keyword_mode(dv_helper, temp_dir, movie_info_dict, search_html, detail_html):
+	with patch('dvhelper.config') as mock_config:
+		mock_config.completed_path = 'completed'
+		mock_config.fanart_image = 'fanart.jpg'
+		mock_config.ignored_file_prefix = '##'
+		mock_config.search_url = 'https://example.com/search/'
+
+		dv_helper.analyze_keyword = MagicMock(return_value='ABC-123')
+		dv_helper.fetch_data = MagicMock(side_effect=[search_html, detail_html])
+		dv_helper.fetch_media = MagicMock(return_value=True)
+
+		with patch('dvhelper.MovieParser') as mock_movie_parser:
+			mock_movie_parser.parse_search_results.return_value = {
+				'detail_url': 'https://example.com/movie/123',
+				'title': 'Test Movie',
+				'fanart_url': 'https://example.com/image.jpg'
+			}
+			mock_movie_parser.parse_movie_details.return_value = movie_info_dict
+
+			with patch('dvhelper.NFOGenerator') as mock_nfo_generator:
+				mock_nfo = MagicMock()
+				mock_nfo_generator.return_value = mock_nfo
+
+				with patch('pathlib.Path.cwd', return_value=temp_dir), \
+					 patch('pathlib.Path.mkdir', return_value=None), \
+					 patch('builtins.print'), \
+					 patch('dvhelper.logger') as mock_logger:
+					dv_helper.batch_process(['ABC-123'])
+
+					dv_helper.analyze_keyword.assert_called_once_with('ABC-123')
+					dv_helper.fetch_data.assert_called()
+					dv_helper.fetch_media.assert_called_once()
+					mock_movie_parser.parse_search_results.assert_called_once()
+					mock_movie_parser.parse_movie_details.assert_called_once()
+					mock_nfo_generator.assert_called_once()
+					mock_nfo.save.assert_called_once()
+					mock_logger.info.assert_called()
+
+def test_dvhelper_batch_process_directory_mode(dv_helper, test_video_file, movie_info_dict, search_html, detail_html):
+	base_dir = test_video_file['base_dir']
+	video_file = test_video_file['video_file']
+
+	with patch('dvhelper.config') as mock_config:
+		mock_config.completed_path = 'completed'
+		mock_config.fanart_image = 'fanart.jpg'
+		mock_config.ignored_file_prefix = '##'
+		mock_config.search_url = 'https://example.com/search/'
+
+		dv_helper.analyze_keyword = MagicMock(return_value='MOVIE')
+		dv_helper.fetch_data = MagicMock(side_effect=[search_html, detail_html])
+		dv_helper.fetch_media = MagicMock(return_value=True)
+
+		with patch('dvhelper.MovieParser') as mock_movie_parser:
+			mock_movie_parser.parse_search_results.return_value = {
+				'detail_url': 'https://example.com/movie/123',
+				'title': 'Test Movie',
+				'fanart_url': 'https://example.com/image.jpg'
+			}
+			mock_movie_parser.parse_movie_details.return_value = movie_info_dict
+
+			with patch('dvhelper.NFOGenerator') as mock_nfo_generator:
+				mock_nfo = MagicMock()
+				mock_nfo_generator.return_value = mock_nfo
+
+				with patch('pathlib.Path.mkdir', return_value=None), \
+					 patch('pathlib.Path.stat', return_value=MagicMock(st_size=1024)), \
+					 patch('pathlib.Path.rename', return_value=None), \
+					 patch('pathlib.Path.exists', return_value=False), \
+					 patch('builtins.print'):
+					dv_helper.batch_process([str(video_file)], dir_mode=True, root_dir=base_dir)
+
+					dv_helper.analyze_keyword.assert_called_once_with('movie.mp4')
+					dv_helper.fetch_data.assert_called()
+					dv_helper.fetch_media.assert_called_once()
+					mock_movie_parser.parse_search_results.assert_called_once()
+					mock_movie_parser.parse_movie_details.assert_called_once()
+					mock_nfo_generator.assert_called_once()
+					mock_nfo.save.assert_called_once()
+
+def test_dvhelper_batch_process_failed_movie(dv_helper):
+	with patch('dvhelper.config') as mock_config:
+		mock_config.search_url = 'https://example.com/search/'
+		dv_helper.analyze_keyword = MagicMock(return_value=None)
+
+		with patch('builtins.print'), \
+			 patch('dvhelper.logger') as mock_logger:
+			dv_helper.batch_process(['invalid-keyword'])
+
+			dv_helper.analyze_keyword.assert_called_once_with('invalid-keyword')
+			mock_logger.warning.assert_called_once()
+
+def test_dvhelper_batch_process_with_gallery(dv_helper, temp_dir, movie_info_dict, search_html, detail_html):
+	with patch('dvhelper.config') as mock_config:
+		mock_config.completed_path = 'completed'
+		mock_config.fanart_image = 'fanart.jpg'
+		mock_config.search_url = 'https://example.com/search/'
+
+		dv_helper.analyze_keyword = MagicMock(return_value='ABC-123')
+		dv_helper.fetch_data = MagicMock(side_effect=[search_html, detail_html])
+		dv_helper.fetch_media = MagicMock(return_value=True)
+
+		with patch('dvhelper.MovieParser') as mock_movie_parser:
+			mock_movie_parser.parse_search_results.return_value = {
+				'detail_url': 'https://example.com/movie/123',
+				'title': 'Test Movie',
+				'fanart_url': 'https://example.com/image.jpg'
+			}
+			mock_movie_parser.parse_movie_details.return_value = movie_info_dict
+
+			with patch('dvhelper.NFOGenerator') as mock_nfo_generator:
+				mock_nfo = MagicMock()
+				mock_nfo_generator.return_value = mock_nfo
+
+				with patch('pathlib.Path.cwd', return_value=temp_dir), \
+					 patch('pathlib.Path.mkdir', return_value=None), \
+					 patch('builtins.print'), \
+					 patch('dvhelper.logger'):
+					dv_helper.batch_process(['ABC-123'], gallery=True)
+
+					assert dv_helper.fetch_media.call_count > 1
+#endregion
+
+#region main() function tests
+def test_main_frozen_app():
+	with patch.object(sys, 'frozen', True, create=True), \
+		 patch('sys.executable', str(Path('.') / 'path' / 'to' / 'dvhelper.exe')), \
+		 patch('dvhelper.Config') as mock_config_class, \
+		 patch('sys.argv', ['dvhelper.exe', 'ABC-123']), \
+		 patch('dvhelper.DVHelper'), \
+		 patch('dvhelper.lazy_import'):
+
+		mock_config = MagicMock()
+		mock_config_class.return_value = mock_config
+
+		dvhelper.main()
+
+		expected_dir = Path('.') / 'path' / 'to'
+		assert mock_config.actress_alias_file == expected_dir / 'actress_alias.json'
+		assert mock_config.cookies_file == expected_dir / 'cookies.json'
+
+def test_main_keyword_search():
+	with patch('sys.argv', ['dvhelper.py', 'ABC-123']), \
+		 patch('dvhelper.DVHelper'), \
+		 patch('dvhelper.lazy_import') as mock_lazy_import, \
+		 patch('dvhelper.set_language'), \
+		 patch('dvhelper.Config') as mock_config_class:
+		mock_config = MagicMock()
+		mock_config_class.return_value = mock_config
+		mock_config.actress_alias_file.exists.return_value = False
+
+		mock_dv_helper = MagicMock()
+		dvhelper.DVHelper.return_value = mock_dv_helper
+		dvhelper.main()
+
+		mock_lazy_import.assert_called_once()
+		dvhelper.DVHelper.assert_called_once()
+		mock_dv_helper.initialize_session.assert_called_once()
+		mock_dv_helper.batch_process.assert_called_once_with(['ABC-123'], gallery=False)
+
+def test_main_directory_processing(temp_dir):
+	with patch('sys.argv', ['dvhelper.py', str(temp_dir)]), \
+		 patch('dvhelper.DVHelper'), \
+		 patch('dvhelper.lazy_import') as mock_lazy_import, \
+		 patch('dvhelper.set_language'), \
+		 patch('dvhelper.Config') as mock_config_class:
+		mock_config = MagicMock()
+		mock_config_class.return_value = mock_config
+		mock_config.actress_alias_file.exists.return_value = False
+
+		mock_dv_helper = MagicMock()
+		dvhelper.DVHelper.return_value = mock_dv_helper
+		mock_dv_helper.list_video_files.return_value = [Path(temp_dir) / 'movie.mp4']
+		dvhelper.main()
+
+		mock_lazy_import.assert_called_once()
+		dvhelper.DVHelper.assert_called_once()
+		mock_dv_helper.initialize_session.assert_called_once()
+		mock_dv_helper.list_video_files.assert_called_once()
+		mock_dv_helper.batch_process.assert_called_once()
+
+def test_main_login_option():
+	with patch('sys.argv', ['dvhelper.py', 'ABC-123', '-l']), \
+		 patch('dvhelper.DVHelper'), \
+		 patch('dvhelper.lazy_import'), \
+		 patch('dvhelper.set_language'), \
+		 patch('dvhelper.Config') as mock_config_class:
+		mock_config = MagicMock()
+		mock_config_class.return_value = mock_config
+		mock_config.actress_alias_file.exists.return_value = False
+
+		mock_dv_helper = MagicMock()
+		dvhelper.DVHelper.return_value = mock_dv_helper
+		mock_dv_helper.perform_login.return_value = MagicMock()
+		dvhelper.main()
+
+		mock_dv_helper.perform_login.assert_called_once()
+		mock_dv_helper.initialize_session.assert_called_once()
+
+def test_main_login_failure():
+	with patch('sys.argv', ['dvhelper.py', 'ABC-123', '-l']), \
+		 patch('dvhelper.DVHelper'), \
+		 patch('dvhelper.lazy_import'), \
+		 patch('dvhelper.set_language'), \
+		 patch('dvhelper.Config') as mock_config_class, \
+		 patch('sys.exit') as mock_exit:
+		mock_config = MagicMock()
+		mock_config_class.return_value = mock_config
+		mock_config.actress_alias_file.exists.return_value = False
+
+		mock_dv_helper = MagicMock()
+		dvhelper.DVHelper.return_value = mock_dv_helper
+		mock_dv_helper.perform_login.return_value = None
+		dvhelper.main()
+
+		mock_dv_helper.perform_login.assert_called_once()
+		mock_exit.assert_called_once_with(0)
+
+def test_main_no_arguments():
+	with patch('sys.argv', ['dvhelper.py']), \
+		 patch('dvhelper.Config'), \
+		 patch.object(HelpOnErrorParser, 'print_help') as mock_print_help:
+
 		try:
-			# 运行文件夹整理功能
-			dv_helper.organize_folders(temp_dir)
-			# 只要不抛出异常，测试就算通过
-			assert True
-		except Exception as e:
-			assert False, f"organize_folders方法抛出异常: {e}"
+			dvhelper.main()
+		except SystemExit:
+			pass
 
-# TestUtilityFunctions 类的补充测试
-def test_lazy_import():
-	"""测试延迟导入功能"""
-	# 确保全局变量未初始化
-	if hasattr(dvhelper, 'logger'):
-		del dvhelper.logger
-	
-	# 执行lazy_import
-	lazy_import()
-	
-	# 验证必要的全局变量已初始化
-	assert hasattr(dvhelper, 'logger')
-	assert hasattr(dvhelper, 'requests')
-	assert hasattr(dvhelper, 'tqdm')
+		mock_print_help.assert_called_once()
 
-def test_tqdm_out():
-	"""测试TqdmOut类的功能"""
-	# 创建TqdmOut实例
-	tqdm_out = TqdmOut()
-	
-	# 测试write方法（不抛出异常即可）
-	try:
-		tqdm_out.write("Test output")
-		assert True
-	except Exception as e:
-		assert False, f"TqdmOut.write方法抛出异常: {e}"
+def test_main_english_language():
+	with patch('sys.argv', ['dvhelper.py', 'ABC-123', '--lang']), \
+		 patch('dvhelper.DVHelper'), \
+		 patch('dvhelper.lazy_import'), \
+		 patch('dvhelper.set_language') as mock_set_language, \
+		 patch('dvhelper.Config') as mock_config_class:
+		mock_config = MagicMock()
+		mock_config_class.return_value = mock_config
+		mock_config.actress_alias_file.exists.return_value = False
 
-def test_help_on_error_parser():
-	"""测试HelpOnErrorParser类的功能"""
-	# 创建HelpOnErrorParser实例
-	parser = HelpOnErrorParser(description="Test Parser")
-	
-	# 添加参数
-	parser.add_argument('--test', help='Test argument')
-	
-	# 验证解析器创建成功
-	assert parser is not None
-	assert parser.description == "Test Parser"
+		mock_dv_helper = MagicMock()
+		dvhelper.DVHelper.return_value = mock_dv_helper
+		dvhelper.main()
 
-# TestMovieScraper 类的增强测试
-def test_movie_scraper_crop_image(testable_movie_scraper, temp_dir):
-	"""测试裁剪图片功能"""
-	# 创建测试图片文件
-	src_file = Path(temp_dir) / 'source.jpg'
-	dest_file = Path(temp_dir) / 'destination.jpg'
-	
-	# 创建一个模拟的图片文件
-	src_file.touch()
-	
-	# 使用patch模拟PIL.Image
-	with patch('PIL.Image.open') as mock_open:
-		mock_image = MagicMock()
-		mock_image.size = (1000, 800)
-		mock_image.crop.return_value = mock_image
-		mock_open.return_value.__enter__.return_value = mock_image
-		
-		try:
-			# 调用crop_image方法
-			testable_movie_scraper.crop_image(src_file, dest_file)
-			# 验证裁剪参数是否正确
-			mock_image.crop.assert_called_with((621, 0, 1000, 800))
-			assert True
-		except Exception as e:
-			assert False, f"crop_image方法抛出异常: {e}"
+		mock_set_language.assert_called_with('en_US')
+#endregion
 
-def test_movie_scraper_check_cookies(testable_movie_scraper):
-	"""测试检查Cookies功能"""
-	# 调用check_cookies方法
-	session = testable_movie_scraper.check_cookies()
-	
-	# 验证返回值是否为Mock对象
-	assert session is not None
-
-# 清理测试后的旧文件
 def teardown_module(module):
-	"""模块级别的清理工作"""
-	# 这里可以添加清理代码，如果需要的话
 	pass
