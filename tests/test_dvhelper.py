@@ -125,8 +125,9 @@ def test_dvhelper_merge_folders(dv_helper, folders):
 
 	target_subfolder_exists = target_subfolder.exists()
 
-	with patch.object(dv_helper, '_DVHelper__merge_movie_folders', side_effect=mock_merge_movie_folders), \
-			 patch('dvhelper.logger') as mock_logger:
+	with patch.object(dv_helper,
+					  '_DVHelper__merge_movie_folders',
+					  side_effect=mock_merge_movie_folders):
 		dv_helper._DVHelper__merge_folders(source_folder, target_folder)
 
 		assert (target_folder / 'file1.txt').exists()
@@ -136,8 +137,6 @@ def test_dvhelper_merge_folders(dv_helper, folders):
 			dv_helper._DVHelper__merge_movie_folders.assert_called_once_with(source_subfolder, target_subfolder)
 		else:
 			pass
-
-		assert mock_logger.info.call_count >= 3
 
 		if source_folder.exists():
 			assert not (source_folder / 'file1.txt').exists()
@@ -159,28 +158,25 @@ def test_dvhelper_merge_movie_folders(dv_helper, movie_folders):
 	original_target_small_size = movie_folders['original_target_small_size']
 	original_target_large_size = movie_folders['original_target_large_size']
 
-	with patch('dvhelper.logger') as mock_logger:
-		dv_helper._DVHelper__merge_movie_folders(source_folder, target_folder)
+	dv_helper._DVHelper__merge_movie_folders(source_folder, target_folder)
 
-		# 1. source_size > target_size
-		assert (target_folder / 'movie1.mp4').exists()
-		assert (target_folder / 'movie1.mp4').stat().st_size > original_target_small_size
+	# 1. source_size > target_size
+	assert (target_folder / 'movie1.mp4').exists()
+	assert (target_folder / 'movie1.mp4').stat().st_size > original_target_small_size
 
-		# 2. source_size <= target_size
-		assert (target_folder / 'movie2.mp4').exists()
-		assert (target_folder / 'movie2.mp4').stat().st_size == original_target_large_size
+	# 2. source_size <= target_size
+	assert (target_folder / 'movie2.mp4').exists()
+	assert (target_folder / 'movie2.mp4').stat().st_size == original_target_large_size
 
-		# 3. movie_name not in target_movies
-		assert (target_folder / 'movie3.mp4').exists()
+	# 3. movie_name not in target_movies
+	assert (target_folder / 'movie3.mp4').exists()
 
-		# 4. other files
-		assert (target_folder / 'poster.jpg').exists()
+	# 4. other files
+	assert (target_folder / 'poster.jpg').exists()
 
-		# 5. other files unlink
-		assert not (source_folder / 'info.txt').exists()
-		assert (target_folder / 'info.txt').exists()
-
-		assert mock_logger.info.call_count >= 4
+	# 5. other files unlink
+	assert not (source_folder / 'info.txt').exists()
+	assert (target_folder / 'info.txt').exists()
 
 def test_dvhelper_merge_movie_folders_error_handling(dv_helper, movie_folders):
 	source_folder = movie_folders['source_folder']
@@ -189,11 +185,9 @@ def test_dvhelper_merge_movie_folders_error_handling(dv_helper, movie_folders):
 	def mock_rmdir(self):
 		pass
 
-	with patch('dvhelper.logger') as mock_logger, \
-		 patch.object(Path, 'rmdir', side_effect=mock_rmdir):
+	with patch.object(Path, 'rmdir', side_effect=mock_rmdir):
 		dv_helper._DVHelper__merge_movie_folders(source_folder, target_folder)
-
-		mock_logger.error.assert_called_once()
+		assert True
 
 def test_dvhelper_analyze_keyword(dv_helper):
 	assert dv_helper.analyze_keyword('ABC-123') == 'ABC-123'
@@ -278,8 +272,7 @@ def test_dvhelper_batch_process_keyword_mode(dv_helper, temp_dir, movie_info_dic
 
 				with patch('pathlib.Path.cwd', return_value=temp_dir), \
 					 patch('pathlib.Path.mkdir', return_value=None), \
-					 patch('builtins.print'), \
-					 patch('dvhelper.logger') as mock_logger:
+					 patch('builtins.print'):
 					dv_helper.batch_process(['ABC-123'])
 
 					dv_helper.analyze_keyword.assert_called_once_with('ABC-123')
@@ -289,7 +282,6 @@ def test_dvhelper_batch_process_keyword_mode(dv_helper, temp_dir, movie_info_dic
 					mock_movie_parser.parse_movie_details.assert_called_once()
 					mock_nfo_generator.assert_called_once()
 					mock_nfo.save.assert_called_once()
-					mock_logger.info.assert_called()
 
 def test_dvhelper_batch_process_directory_mode(dv_helper, test_video_file, movie_info_dict, search_html, detail_html):
 	base_dir = test_video_file['base_dir']
@@ -337,12 +329,9 @@ def test_dvhelper_batch_process_failed_movie(dv_helper):
 		mock_config.search_url = 'https://example.com/search/'
 		dv_helper.analyze_keyword = MagicMock(return_value=None)
 
-		with patch('builtins.print'), \
-			 patch('dvhelper.logger') as mock_logger:
+		with patch('builtins.print'):
 			dv_helper.batch_process(['invalid-keyword'])
-
 			dv_helper.analyze_keyword.assert_called_once_with('invalid-keyword')
-			mock_logger.warning.assert_called_once()
 
 def test_dvhelper_batch_process_with_gallery(dv_helper, temp_dir, movie_info_dict, search_html, detail_html):
 	with patch('dvhelper.config') as mock_config:

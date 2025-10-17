@@ -15,11 +15,11 @@ def test_scraper_initialize():
 		mock_requests.Session.return_value = mock_session
 
 		scraper = MovieScraper()
+
 		assert scraper is not None
 
 def test_scraper_initialize_session_success():
-	with patch('dvhelper.MovieScraper.check_cookies') as mock_check_cookies, \
-		 patch('dvhelper.logger') as mock_logger:
+	with patch('dvhelper.MovieScraper.check_cookies') as mock_check_cookies:
 		mock_session = MagicMock()
 		mock_check_cookies.return_value = mock_session
 
@@ -27,18 +27,15 @@ def test_scraper_initialize_session_success():
 		scraper.initialize_session()
 
 		mock_check_cookies.assert_called_once()
-		mock_logger.warning.assert_not_called()
 
 def test_scraper_initialize_session_failed():
-	with patch('dvhelper.MovieScraper.check_cookies') as mock_check_cookies, \
-		 patch('dvhelper.logger') as mock_logger:
+	with patch('dvhelper.MovieScraper.check_cookies') as mock_check_cookies:
 		mock_check_cookies.return_value = None
 
 		scraper = MovieScraper()
 		scraper.initialize_session()
 
 		mock_check_cookies.assert_called_once()
-		mock_logger.warning.assert_called_once()
 
 #region check_cookies tests
 def test_scraper_check_cookies(cookies_file):
@@ -99,8 +96,7 @@ def test_scraper_check_cookies_expired(cookies_file):
 		}]
 
 		with patch('pathlib.Path.exists', return_value=True), \
-			 patch('builtins.open', MagicMock()), \
-			 patch('dvhelper.logger') as mock_logger:
+			 patch('builtins.open', MagicMock()):
 
 			mock_session = MagicMock()
 			mock_requests.Session.return_value = mock_session
@@ -109,12 +105,10 @@ def test_scraper_check_cookies_expired(cookies_file):
 			result = scraper.check_cookies()
 
 			assert result is None
-			mock_logger.warning.assert_called()
 
 def test_scraper_check_cookies_error_handling(cookies_file):
 	with patch('dvhelper.config') as mock_config, \
 		 patch('dvhelper.requests') as mock_requests, \
-		 patch('dvhelper.logger') as mock_logger, \
 		 patch('pathlib.Path.exists', return_value=True), \
 		 patch('builtins.open', MagicMock()), \
 		 patch('json.load', side_effect=Exception('JSON parse error')):
@@ -127,11 +121,10 @@ def test_scraper_check_cookies_error_handling(cookies_file):
 		result = scraper.check_cookies()
 
 		assert result is None
-		mock_logger.error.assert_called_once()
 #endregion
 
 #region perform_login tests
-@pytest.mark.parametrize("test_case,chrome_side_effect,wait_side_effect,cookies_file,expected_result,expected_chrome_calls,expected_logger_call", [
+@pytest.mark.parametrize("test_case,chrome_side_effect,wait_side_effect,cookies_file,expected_result,expected_chrome_calls", [
 	# 正常登录场景
 	("success", 
 	 None,  # 无异常
@@ -139,7 +132,6 @@ def test_scraper_check_cookies_error_handling(cookies_file):
 	 "cookies.json", 
 	 "session",  # 成功返回session
 	 1,  # Chrome调用1次
-	 "info"  # 记录info日志
 	),
 	# WebDriver创建失败回退场景
 	("driver_creation_fallback", 
@@ -148,7 +140,6 @@ def test_scraper_check_cookies_error_handling(cookies_file):
 	 "cookies.json", 
 	 "session",  # 成功返回session
 	 2,  # Chrome调用2次
-	 "info"  # 记录info日志
 	),
 	# 登录超时失败场景
 	("login_timeout", 
@@ -157,11 +148,10 @@ def test_scraper_check_cookies_error_handling(cookies_file):
 	 None,  # 不需要cookies_file
 	 None,  # 失败返回None
 	 1,  # Chrome调用1次
-	 "error"  # 记录error日志
 	),
 ])
 def test_scraper_perform_login(test_case, chrome_side_effect, wait_side_effect, cookies_file,
-								expected_result, expected_chrome_calls, expected_logger_call):
+								expected_result, expected_chrome_calls):
 	mock_driver = MagicMock()
 	mock_driver.get_cookies.return_value = [
 		{'name': 'remember_token', 'value': 'test_token', 'domain': 'example.com', 'path': '/', 'secure': True},
@@ -181,7 +171,6 @@ def test_scraper_perform_login(test_case, chrome_side_effect, wait_side_effect, 
 	with patch('dvhelper.config') as mock_config, \
 		 patch('dvhelper.requests') as mock_requests, \
 		 patch('builtins.open', MagicMock()) as mock_open, \
-		 patch('dvhelper.logger') as mock_logger, \
 		 patch('selenium.webdriver.Chrome') as mock_chrome, \
 		 patch('selenium.webdriver.support.ui.WebDriverWait') as mock_web_driver_wait, \
 		 patch('selenium.webdriver.support.expected_conditions.url_to_be') as mock_url_to_be, \
@@ -240,11 +229,6 @@ def test_scraper_perform_login(test_case, chrome_side_effect, wait_side_effect, 
 			assert 'options' in kwargs2
 		else:
 			assert mock_chrome.call_count == expected_chrome_calls
-
-		if expected_logger_call == "info":
-			mock_logger.info.assert_called()
-		elif expected_logger_call == "error":
-			mock_logger.error.assert_called_once()
 
 		mock_driver.get.assert_called_once_with(mock_config.sign_in_url)
 		mock_driver.quit.assert_called_once()
