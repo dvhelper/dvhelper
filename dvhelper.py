@@ -552,7 +552,7 @@ class MovieScraper():
 		for retry in range(1, max_retries + 1):
 			current_timeout = initial_timeout * (backoff_factor ** (retry - 1))
 
-			if retry > max_retries:
+			if retry > 1:
 				print(_('第 {retry}/{retries} 次尝试（超时时间: {timeout} 秒）')
 					.format(retry=retry, retries=max_retries, timeout=current_timeout))
 
@@ -591,7 +591,7 @@ class MovieScraper():
 		for retry in range(1, max_retries + 1):
 			current_timeout = initial_timeout * (backoff_factor ** (retry - 1))
 
-			if retry > max_retries:
+			if retry > 1:
 				print(_('第 {retry}/{retries} 次尝试（超时时间: {timeout} 秒）')
 					.format(retry=retry, retries=max_retries, timeout=current_timeout))
 
