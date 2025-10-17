@@ -27,8 +27,8 @@ repository = "https://github.com/dvhelper/dvhelper"
 dvhelper = "dvhelper:main"
 
 [[tool.poetry.source]]
-name = "mirrors"
-url = "https://pypi.tuna.tsinghua.edu.cn/simple/"
+name = "aliyun"
+url = "https://mirrors.aliyun.com/pypi/simple"
 priority = "primary"
 
 [build-system]
