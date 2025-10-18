@@ -1,6 +1,4 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-"""pytest 共享配置和fixture"""
+"""pytest 共享配置和 fixture"""
 import sys
 import os
 import pytest
@@ -9,37 +7,17 @@ import tempfile
 import shutil
 from unittest.mock import patch, MagicMock
 
-# 确保可以导入被测试模块
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# 导入dvhelper模块并初始化
-sys.modules['dvhelper'] = __import__('dvhelper')
 import dvhelper
-# 调用lazy_import初始化所有依赖
 dvhelper.lazy_import()
 
-# 从dvhelper模块导入所有需要的类和函数
-from dvhelper import (
-	Config, MovieInfo, NFOGenerator, MovieParser, MovieScraper, DVHelper,
-	set_language, get_logger, lazy_import, TqdmOut, HelpOnErrorParser
-)
-
-
-# 模拟全局config变量，dvhelper模块在main()函数中定义config
+from dvhelper import Config, MovieInfo, DVHelper
 dvhelper.config = Config()
+
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_dvhelper():
-	"""全局设置，确保lazy_import被调用并初始化必要的全局变量"""
-	# 确保全局config变量存在
-	if not hasattr(dvhelper, 'config'):
-		dvhelper.config = Config()
-	
-	# 确保全局logger变量存在
-	if not hasattr(dvhelper, 'logger'):
-		dvhelper.logger = get_logger()
-
-	# 模拟requests模块，避免实际网络请求
 	with patch('dvhelper.requests') as mock_requests:
 		mock_response = MagicMock()
 		mock_response.text = '<html>Test Content</html>'
@@ -50,23 +28,21 @@ def setup_dvhelper():
 
 @pytest.fixture
 def temp_dir():
-	"""创建临时目录的fixture"""
 	temp_dir = tempfile.mkdtemp()
 	yield Path(temp_dir)
-	# 清理临时目录
 	shutil.rmtree(temp_dir)
 
 @pytest.fixture
 def config():
-	"""Config实例的fixture"""
 	return Config()
 
 @pytest.fixture
 def movie_info_dict():
-	"""影片信息字典的fixture"""
 	return {
 		'detail_url': 'https://example.com/movie/123',
 		'fanart_url': 'https://example.com/image.jpg',
+		'trailer_url': 'https://example.com/trailer.mp4',
+		'galleries': ['https://example.com/gallery1.jpg', 'https://example.com/gallery2.jpg'],
 		'number': 'ABC-123',
 		'title': 'Test Movie',
 		'year': '2023',
@@ -82,24 +58,37 @@ def movie_info_dict():
 	}
 
 @pytest.fixture
+def empty_movie_info_dict():
+	return {
+		'title': 'Test Movie',
+		'year': '2023',
+		'runtime': '120',
+		'mpaa': 'NC-17',
+		'country': 'Japan'
+	}
+
+@pytest.fixture
 def movie_info(movie_info_dict):
-	"""MovieInfo实例的fixture"""
 	return MovieInfo(movie_info_dict)
 
 @pytest.fixture
+def empty_movie_info(empty_movie_info_dict):
+	return MovieInfo(empty_movie_info_dict)
+
+@pytest.fixture
 def search_html():
-	"""模拟的搜索结果HTML的fixture"""
 	return '''
 	<div class="flex flex-col relative hover:bg-zinc-100 hover:dark:bg-zinc-800">
 		<a href="/movie/123" title="ABC-123 Test Movie">
 			<img src="https://example.com/image.jpg" alt="Test Movie">
 		</a>
 	</div>
+	<div class="flex flex-col relative hover:bg-zinc-100 hover:dark:bg-zinc-800">
+	</div>
 	'''
 
 @pytest.fixture
 def detail_html():
-	"""模拟的影片详情HTML的fixture"""
 	return '''
 	<ul class="flex flex-col gap-2">
 		<li>番号:ABC-123复制</li>
@@ -109,7 +98,8 @@ def detail_html():
 		<li>制作商:Studio Y</li>
 		<li>发行商:Publisher Z</li>
 		<li>标签:tag1,tag2</li>
-		<li>演员:Actress A,Actress B</li>
+		<li>演员:Actress A,Actress B,<a class="male">Actress Male</a></li>
+		<li>凑数</li>
 	</ul>
 	<a href="https://example.com/trailer.mp4" data-fancybox="gallery" data-caption="预告片"></a>
 	<a href="https://example.com/gallery1.jpg" data-fancybox="gallery"></a>
@@ -117,8 +107,20 @@ def detail_html():
 	'''
 
 @pytest.fixture
+def crop_image(temp_dir):
+	src_file = Path(temp_dir) / 'source.jpg'
+	dest_file = Path(temp_dir) / 'destination.jpg'
+	return {
+		'src_file': src_file,
+		'dest_file': dest_file
+	}
+
+@pytest.fixture
+def nfo_save_file(temp_dir):
+	return Path(temp_dir) / 'TEST-001.nfo'
+
+@pytest.fixture
 def actress_alias():
-	"""模拟的演员别名配置的fixture"""
 	return {
 		'Actress A': ['Alias A1', 'Alias A2'],
 		'Actress B': ['Alias B1']
@@ -126,70 +128,160 @@ def actress_alias():
 
 @pytest.fixture
 def dv_helper():
-	"""DVHelper实例的fixture"""
 	return DVHelper()
 
+@pytest.fixture
+def movie_folders(temp_dir):
+	source_folder = Path(temp_dir) / 'source_movie'
+	target_folder = Path(temp_dir) / 'target_movie'
+	source_folder.mkdir()
+	target_folder.mkdir()
 
-# 可测试的MovieScraper子类
-class TestableMovieScraper(MovieScraper):
-	"""可测试的MovieScraper子类，用于测试"""
-	__test__ = False  # 告诉pytest不要将此类作为测试类收集
-	
-	def __init__(self):
-		"""初始化测试类"""
-		super().__init__()
-		# 初始化会话为一个模拟对象
-		self.__session = MagicMock()
-		# 用于存储调用历史
-		self.call_history = []
-		# 默认行为是成功
-		self.should_succeed = True
-		# 用于模拟响应
-		self.mock_response = '<html>Test Content</html>'
-		# 用于模拟异常
-		self.mock_exception = Exception('Request failed')
-	
-	def fetch_data(self, url, max_retries=3, initial_timeout=30, backoff_factor=2):
-		"""重写fetch_data方法，避免实际的HTTP请求"""
-		# 记录调用
-		self.call_history.append({
-			'url': url,
-			'max_retries': max_retries,
-			'initial_timeout': initial_timeout,
-			'backoff_factor': backoff_factor,
-			'is_media': False
-		})
-		
-		# 根据should_succeed决定返回内容或None（按照实际方法的返回值行为）
-		if self.should_succeed:
-			return self.mock_response
-		else:
-			return None
-	
-	def fetch_media(self, movie_path, media_file, url, crop=False, max_retries=3, initial_timeout=30, backoff_factor=2):
-		"""重写fetch_media方法，避免实际的HTTP请求和文件操作"""
-		# 记录调用
-		self.call_history.append({
-			'movie_path': movie_path,
-			'media_file': media_file,
-			'url': url,
-			'crop': crop,
-			'max_retries': max_retries,
-			'initial_timeout': initial_timeout,
-			'backoff_factor': backoff_factor,
-			'is_media': True
-		})
-		
-		# 根据should_succeed决定返回True或False
-		return self.should_succeed
-	
-	def check_cookies(self):
-		"""重写check_cookies方法，返回一个模拟的会话"""
-		mock_session = MagicMock()
-		return mock_session
+	# 1. source_size > target_size
+	source_movie_large = source_folder / 'movie1.mp4'
+	with open(source_movie_large, 'w') as f:
+		f.write('source large movie content' * 300)
 
+	target_movie_small = target_folder / 'movie1.mp4'
+	with open(target_movie_small, 'w') as f:
+		f.write('target small movie content')
+
+	# 2. source_size <= target_size
+	source_movie_small = source_folder / 'movie2.mp4'
+	with open(source_movie_small, 'w') as f:
+		f.write('source small movie content')
+
+	target_movie_large = target_folder / 'movie2.mp4'
+	with open(target_movie_large, 'w') as f:
+		f.write('target large movie content' * 200)
+
+	# 3. movie_name not in target_movies
+	source_movie_new = source_folder / 'movie3.mp4'
+	with open(source_movie_new, 'w') as f:
+		f.write('new movie content')
+
+	# 4. other files
+	with open(source_folder / 'poster.jpg', 'w') as f:
+		f.write('poster content')
+
+	# 5. other files unlink
+	with open(source_folder / 'info.txt', 'w') as f:
+		f.write('source info content')
+	with open(target_folder / 'info.txt', 'w') as f:
+		f.write('target info content')
+
+	original_target_small_size = target_movie_small.stat().st_size
+	original_target_large_size = target_movie_large.stat().st_size
+
+	return {
+		'source_folder': source_folder,
+		'target_folder': target_folder,
+		'original_target_small_size': original_target_small_size,
+		'original_target_large_size': original_target_large_size
+	}
+
+@pytest.fixture(params=[
+	(True), # subfolder exists
+	(False),
+])
+def folders(temp_dir, request):
+	source_folder = Path(temp_dir) / 'source'
+	target_folder = Path(temp_dir) / 'target'
+	source_folder.mkdir()
+	target_folder.mkdir()
+
+	target_subfolder_exists = request.param
+
+	with open(source_folder / 'file1.txt', 'w') as f:
+		f.write('test1')
+
+	source_subfolder = source_folder / 'subfolder'
+	source_subfolder.mkdir()
+	with open(source_subfolder / 'subfile.txt', 'w') as f:
+		f.write('subfolder content')
+
+	target_subfolder = target_folder / 'subfolder'
+	if target_subfolder_exists:
+		target_subfolder.mkdir()
+		with open(target_subfolder / 'existing_file.txt', 'w') as f:
+			f.write('existing content')
+
+	result = {
+		'source_folder': source_folder,
+		'target_folder': target_folder,
+		'source_subfolder': source_subfolder
+	}
+
+	if target_subfolder_exists:
+		result['target_subfolder'] = target_folder / 'subfolder'
+	return result
 
 @pytest.fixture
-def testable_movie_scraper():
-	"""TestableMovieScraper实例的fixture"""
-	return TestableMovieScraper()
+def folders_basic(temp_dir):
+	source_folder = Path(temp_dir) / 'source'
+	target_folder = Path(temp_dir) / 'target'
+	source_folder.mkdir()
+	target_folder.mkdir()
+
+	with open(source_folder / 'file1.txt', 'w') as f:
+		f.write('test1')
+
+	return {
+		'source_folder': source_folder,
+		'target_folder': target_folder
+	}
+
+@pytest.fixture
+def video_files(temp_dir):
+	video1 = Path(temp_dir) / 'movie1.mp4'
+	video2 = Path(temp_dir) / 'movie2.mkv'
+	text_file = Path(temp_dir) / 'document.txt'
+	ignored_file = Path(temp_dir) / '##hidden_file.mp4'
+	sub_dir = Path(temp_dir) / 'subdir'
+	video3 = sub_dir / 'movie3.avi'
+	deep_sub_dir = sub_dir / 'deepdir'
+	video4 = deep_sub_dir / 'movie4.mov'
+
+	video1.touch()
+	video2.touch()
+	text_file.touch()
+	ignored_file.touch()
+	sub_dir.mkdir(exist_ok=True)
+	video3.touch()
+	deep_sub_dir.mkdir(exist_ok=True)
+	video4.touch()
+
+	return {
+		'base_dir': Path(temp_dir),
+		'video1': video1,
+		'video2': video2,
+		'video3': video3,
+		'video4': video4,
+		'text_file': text_file,
+		'ignored_file': ignored_file,
+		'sub_dir': sub_dir,
+		'deep_sub_dir': deep_sub_dir
+	}
+
+@pytest.fixture
+def actress_folders_with_alias(temp_dir):
+	"""创建演员文件夹和别名测试所需的目录结构"""
+	actress_dir = Path(temp_dir) / 'Alias A1'
+	actress_dir.mkdir(exist_ok=True)
+	actress_alias = {'Actress A': ['Alias A1', 'Alias A2']}
+
+	return {
+		'base_dir': Path(temp_dir),
+		'actress_alias': actress_alias
+	}
+
+@pytest.fixture
+def test_video_file(temp_dir):
+	"""创建测试用视频文件"""
+	video_file = temp_dir / 'movie.mp4'
+	video_file.touch()
+
+	return {
+		'base_dir': Path(temp_dir),
+		'video_file': video_file
+	}

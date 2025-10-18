@@ -1,12 +1,8 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-"""测试MovieInfo类的功能"""
+"""测试 MovieInfo 类的功能"""
 from dvhelper import MovieInfo
 
 
-def test_movie_info_initialization(movie_info_dict, movie_info):
-	"""测试影片信息类的初始化"""
-	# 验证所有属性是否正确初始化
+def test_movie_info_initialize(movie_info_dict, movie_info):
 	assert movie_info.detail_url == movie_info_dict['detail_url']
 	assert movie_info.fanart_url == movie_info_dict['fanart_url']
 	assert movie_info.number == movie_info_dict['number']
@@ -23,10 +19,9 @@ def test_movie_info_initialization(movie_info_dict, movie_info):
 	assert movie_info.country == movie_info_dict['country']
 
 def test_movie_info_with_default_values():
-	"""测试带有默认值的影片信息初始化"""
 	info_dict = {'number': 'ABC-123'}
 	movie_info = MovieInfo(info_dict)
-	
+
 	assert movie_info.number == 'ABC-123'
 	assert movie_info.title == ''
 	assert movie_info.tags == []

@@ -345,13 +345,13 @@ class MovieParser():
 		for ul_element in ul_elements:
 			li_elements = ul_element.find_all('li')
 
-			if li_elements:
-				li_contents = []
-				for li in li_elements:
-					for male_a in li.find_all('a', class_='male'):
-						male_a.extract()
-					li_contents.append(li.get_text(strip=True))
-				results = MovieParser.__extract_info_from_list(li_contents)
+			li_contents = []
+			for li in li_elements:
+				for male_a in li.find_all('a', class_='male'):
+					male_a.extract()
+				li_contents.append(li.get_text(strip=True))
+
+			results = MovieParser.__extract_info_from_list(li_contents)
 
 		results['galleries'] = []
 		a_elements = soup.find_all('a', {'data-fancybox': 'gallery'})
@@ -552,7 +552,7 @@ class MovieScraper():
 		for retry in range(1, max_retries + 1):
 			current_timeout = initial_timeout * (backoff_factor ** (retry - 1))
 
-			if retry > max_retries:
+			if retry > 1:
 				print(_('第 {retry}/{retries} 次尝试（超时时间: {timeout} 秒）')
 					.format(retry=retry, retries=max_retries, timeout=current_timeout))
 
@@ -591,7 +591,7 @@ class MovieScraper():
 		for retry in range(1, max_retries + 1):
 			current_timeout = initial_timeout * (backoff_factor ** (retry - 1))
 
-			if retry > max_retries:
+			if retry > 1:
 				print(_('第 {retry}/{retries} 次尝试（超时时间: {timeout} 秒）')
 					.format(retry=retry, retries=max_retries, timeout=current_timeout))
 
