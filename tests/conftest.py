@@ -58,8 +58,22 @@ def movie_info_dict():
 	}
 
 @pytest.fixture
+def empty_movie_info_dict():
+	return {
+		'title': 'Test Movie',
+		'year': '2023',
+		'runtime': '120',
+		'mpaa': 'NC-17',
+		'country': 'Japan'
+	}
+
+@pytest.fixture
 def movie_info(movie_info_dict):
 	return MovieInfo(movie_info_dict)
+
+@pytest.fixture
+def empty_movie_info(empty_movie_info_dict):
+	return MovieInfo(empty_movie_info_dict)
 
 @pytest.fixture
 def search_html():
@@ -84,7 +98,8 @@ def detail_html():
 		<li>制作商:Studio Y</li>
 		<li>发行商:Publisher Z</li>
 		<li>标签:tag1,tag2</li>
-		<li>演员:Actress A,Actress B</li>
+		<li>演员:Actress A,Actress B,<a class="male">Actress Male</a></li>
+		<li>凑数</li>
 	</ul>
 	<a href="https://example.com/trailer.mp4" data-fancybox="gallery" data-caption="预告片"></a>
 	<a href="https://example.com/gallery1.jpg" data-fancybox="gallery"></a>
@@ -170,17 +185,16 @@ def movie_folders(temp_dir):
 	}
 
 @pytest.fixture(params=[
-	(True, True),
-	(True, False),
+	(True), # subfolder exists
+	(False),
 ])
 def folders(temp_dir, request):
 	source_folder = Path(temp_dir) / 'source'
 	target_folder = Path(temp_dir) / 'target'
 	source_folder.mkdir()
+	target_folder.mkdir()
 
-	target_exists, target_subfolder_exists = request.param
-	if target_exists:
-		target_folder.mkdir()
+	target_subfolder_exists = request.param
 
 	with open(source_folder / 'file1.txt', 'w') as f:
 		f.write('test1')
@@ -190,12 +204,11 @@ def folders(temp_dir, request):
 	with open(source_subfolder / 'subfile.txt', 'w') as f:
 		f.write('subfolder content')
 
-	if target_exists:
-		target_subfolder = target_folder / 'subfolder'
-		if target_subfolder_exists:
-			target_subfolder.mkdir()
-			with open(target_subfolder / 'existing_file.txt', 'w') as f:
-				f.write('existing content')
+	target_subfolder = target_folder / 'subfolder'
+	if target_subfolder_exists:
+		target_subfolder.mkdir()
+		with open(target_subfolder / 'existing_file.txt', 'w') as f:
+			f.write('existing content')
 
 	result = {
 		'source_folder': source_folder,
@@ -203,7 +216,7 @@ def folders(temp_dir, request):
 		'source_subfolder': source_subfolder
 	}
 
-	if target_exists:
+	if target_subfolder_exists:
 		result['target_subfolder'] = target_folder / 'subfolder'
 	return result
 

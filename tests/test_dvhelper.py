@@ -14,15 +14,11 @@ from dvhelper import set_language, get_logger, lazy_import, TqdmOut, HelpOnError
 
 
 @pytest.mark.parametrize("lang, expected_calls, i18n_exists", [
-	# 正常情况：提供的语言文件存在
 	('en_US', [(['dvhelper', 'i18n_path', ['en_US']], True)], True),
-	# 情况1：提供的语言文件不存在，回退到en_US
 	('fr_FR', [(['dvhelper', 'i18n_path', ['fr_FR']], False), 
 		  (['dvhelper', 'i18n_path', ['en_US']], True)], True),
-	# 情况2：提供的语言文件不存在，且en_US也不存在
 	('ja_JP', [(['dvhelper', 'i18n_path', ['ja_JP']], False), 
 		  (['dvhelper', 'i18n_path', ['en_US']], False)], True),
-	# 情况3：i18n目录不存在
 	('zh_CN', [], False)
 ])
 def test_set_language(lang, expected_calls, i18n_exists):
@@ -111,19 +107,15 @@ def test_dvhelper_merge_folders(dv_helper, folders):
 	source_folder = folders['source_folder']
 	target_folder = folders['target_folder']
 	source_subfolder = folders['source_subfolder']
-	target_subfolder = folders['target_subfolder']
+	target_subfolder = folders.get('target_subfolder')
 
 	def mock_merge_movie_folders(src, tgt):
 		for item in list(src.iterdir()):
 			if item.is_file():
 				item.rename(tgt / item.name)
+		src.rmdir()
 
-		try:
-			src.rmdir()
-		except Exception:
-			pass
-
-	target_subfolder_exists = target_subfolder.exists()
+	target_subfolder_exists = target_subfolder.exists() if target_subfolder else False
 
 	with patch.object(dv_helper,
 					  '_DVHelper__merge_movie_folders',
@@ -138,9 +130,7 @@ def test_dvhelper_merge_folders(dv_helper, folders):
 		else:
 			pass
 
-		if source_folder.exists():
-			assert not (source_folder / 'file1.txt').exists()
-			assert len(list(source_folder.iterdir())) == 0
+		assert not source_folder.exists()
 
 def test_dvhelper_merge_folders_error_handling(dv_helper, folders_basic):
 	source_folder = folders_basic['source_folder']
@@ -182,10 +172,8 @@ def test_dvhelper_merge_movie_folders_error_handling(dv_helper, movie_folders):
 	source_folder = movie_folders['source_folder']
 	target_folder = movie_folders['target_folder']
 
-	def mock_rmdir(self):
-		pass
-
-	with patch.object(Path, 'rmdir', side_effect=mock_rmdir):
+	with patch('pathlib.Path.rmdir') as mock_rmdir:
+		mock_rmdir.side_effect = Exception("Permission denied")
 		dv_helper._DVHelper__merge_movie_folders(source_folder, target_folder)
 		assert True
 
@@ -194,11 +182,17 @@ def test_dvhelper_analyze_keyword(dv_helper):
 	assert dv_helper.analyze_keyword('ABC123') == 'ABC-123'
 
 	assert dv_helper.analyze_keyword('FC2-123456') == 'FC2-123456'
+	assert dv_helper.analyze_keyword('FC2-123ABC456') is None
 	assert dv_helper.analyze_keyword('FC2 PPV-123456') == 'FC2-123456'
 
 	assert dv_helper.analyze_keyword('259LUXU-1234') == '259LUXU-1234'
+	assert dv_helper.analyze_keyword('259LUXU-ABC1234') is None
+
 	assert dv_helper.analyze_keyword('200GANA-5678') == '200GANA-5678'
+	assert dv_helper.analyze_keyword('200GANA-ABC5678') is None
+
 	assert dv_helper.analyze_keyword('300MIUM-9012') == '300MIUM-9012'
+	assert dv_helper.analyze_keyword('300MIUM-ABC9012') is None
 
 	assert dv_helper.analyze_keyword('Invalid Keyword') is None
 
@@ -440,16 +434,19 @@ def test_main_login_option():
 		mock_dv_helper.perform_login.assert_called_once()
 		mock_dv_helper.initialize_session.assert_called_once()
 
-def test_main_login_failure():
+@pytest.mark.parametrize('alias_file_exists', [True, False])
+def test_main_login_failure(alias_file_exists):
 	with patch('sys.argv', ['dvhelper.py', 'ABC-123', '-l']), \
 		 patch('dvhelper.DVHelper'), \
 		 patch('dvhelper.lazy_import'), \
 		 patch('dvhelper.set_language'), \
+		 patch('json.load') as mock_json_load, \
 		 patch('dvhelper.Config') as mock_config_class, \
 		 patch('sys.exit') as mock_exit:
 		mock_config = MagicMock()
 		mock_config_class.return_value = mock_config
-		mock_config.actress_alias_file.exists.return_value = False
+		mock_config.actress_alias_file.exists.return_value = alias_file_exists
+		mock_json_load.return_value = {}
 
 		mock_dv_helper = MagicMock()
 		dvhelper.DVHelper.return_value = mock_dv_helper

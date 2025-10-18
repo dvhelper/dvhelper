@@ -38,19 +38,36 @@ def test_scraper_initialize_session_failed():
 		mock_check_cookies.assert_called_once()
 
 #region check_cookies tests
-def test_scraper_check_cookies(cookies_file):
-	with patch('dvhelper.config') as mock_config, \
-		 patch('dvhelper.requests') as mock_requests, \
-		 patch('json.load') as mock_json_load:
-		mock_config.cookies_file = cookies_file
-
-		mock_json_load.return_value = [{
+@pytest.mark.parametrize("cookies_data,expected_result", [
+	([
+		{
 			'name': 'remember_token',
 			'value': 'test_token',
 			'expiry': 2147483647,
 			'domain': 'example.com',
 			'path': '/'
-		}]
+		},
+		{
+			'name': 'remember_token',
+			'value': 'expired_token',
+			'domain': 'example.com',
+			'path': '/'
+		}
+	], True),
+	([
+		{
+			'name': 'remember_token',
+			'value': 'expired_token',
+			'expiry': 500,
+			'domain': 'example.com',
+			'path': '/'
+		}
+	], False),
+])
+def test_scraper_check_cookies(cookies_data, expected_result):
+	with patch('dvhelper.requests') as mock_requests, \
+		 patch('json.load') as mock_json_load:
+		mock_json_load.return_value = cookies_data
 
 		with patch('pathlib.Path.exists', return_value=True), \
 			 patch('builtins.open', MagicMock()):
@@ -60,9 +77,12 @@ def test_scraper_check_cookies(cookies_file):
 			scraper = MovieScraper()
 			result = scraper.check_cookies()
 
-			assert result is not None
-			mock_requests.Session.assert_called_once()
-			mock_session.cookies.set.assert_called()
+			if expected_result:
+				assert result is not None
+				mock_requests.Session.assert_called_once()
+				mock_session.cookies.set.assert_called()
+			else:
+				assert result is None
 
 def test_scraper_check_cookies_no_file():
 	with patch('dvhelper.config') as mock_config, \
@@ -74,49 +94,10 @@ def test_scraper_check_cookies_no_file():
 
 		assert result is None
 
-def test_scraper_check_cookies_expired(cookies_file):
-	with patch('dvhelper.config') as mock_config, \
-		 patch('dvhelper.requests') as mock_requests, \
-		 patch('json.load') as mock_json_load, \
-		 patch('datetime.datetime') as mock_datetime:
-		mock_config.cookies_file = cookies_file
-
-		mock_current_time = MagicMock()
-		mock_current_time.timestamp.return_value = 1000
-		mock_datetime.now.return_value = mock_current_time
-		mock_datetime.fromtimestamp.return_value = MagicMock()
-		mock_datetime.fromtimestamp.return_value.__lt__.return_value = True
-
-		mock_json_load.return_value = [{
-			'name': 'remember_token',
-			'value': 'expired_token',
-			'expiry': 500,
-			'domain': 'example.com',
-			'path': '/'
-		}]
-
-		with patch('pathlib.Path.exists', return_value=True), \
-			 patch('builtins.open', MagicMock()):
-
-			mock_session = MagicMock()
-			mock_requests.Session.return_value = mock_session
-
-			scraper = MovieScraper()
-			result = scraper.check_cookies()
-
-			assert result is None
-
-def test_scraper_check_cookies_error_handling(cookies_file):
-	with patch('dvhelper.config') as mock_config, \
-		 patch('dvhelper.requests') as mock_requests, \
-		 patch('pathlib.Path.exists', return_value=True), \
+def test_scraper_check_cookies_error_handling():
+	with patch('pathlib.Path.exists', return_value=True), \
 		 patch('builtins.open', MagicMock()), \
 		 patch('json.load', side_effect=Exception('JSON parse error')):
-		mock_config.cookies_file = cookies_file
-
-		mock_session = MagicMock()
-		mock_requests.Session.return_value = mock_session
-
 		scraper = MovieScraper()
 		result = scraper.check_cookies()
 
@@ -160,11 +141,8 @@ def test_scraper_perform_login(test_case, chrome_side_effect, wait_side_effect, 
 	mock_driver.get.return_value = None
 	mock_driver.quit.return_value = None
 
-	if chrome_side_effect:
-		if test_case == "driver_creation_fallback":
-			chrome_effect = create_driver_fallback_side_effect(mock_driver)
-		else:
-			chrome_effect = chrome_side_effect
+	if chrome_side_effect and test_case == "driver_creation_fallback":
+		chrome_effect = create_driver_fallback_side_effect(mock_driver)
 	else:
 		chrome_effect = mock_driver
 
@@ -176,7 +154,8 @@ def test_scraper_perform_login(test_case, chrome_side_effect, wait_side_effect, 
 		 patch('selenium.webdriver.support.expected_conditions.url_to_be') as mock_url_to_be, \
 		 patch('selenium.webdriver.chrome.options.Options') as mock_options, \
 		 patch('webdriver_manager.chrome.ChromeDriverManager') as mock_driver_manager, \
-		 patch('selenium.webdriver.chrome.service.Service') as mock_service:
+		 patch('selenium.webdriver.chrome.service.Service') as mock_service, \
+		 patch('time.sleep'):
 		mock_config.sign_in_url = 'https://example.com/sign_in'
 		mock_config.base_url = 'https://example.com'
 		mock_config.cookies_file = cookies_file
@@ -235,8 +214,6 @@ def test_scraper_perform_login(test_case, chrome_side_effect, wait_side_effect, 
 
 def create_driver_fallback_side_effect(mock_driver):
 	def side_effect(*args, **kwargs):
-		if not hasattr(side_effect, 'call_count'):
-			side_effect.call_count = 0
 		side_effect.call_count += 1
 
 		if side_effect.call_count == 1 and 'service' in kwargs:

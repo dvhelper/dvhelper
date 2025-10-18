@@ -44,19 +44,6 @@ def test_parse_movie_details(detail_html, actress_alias):
 		assert result['trailer_url'] == 'https://example.com/trailer.mp4'
 		assert len(result['galleries']) == 2
 
-		male_html = detail_html.replace(
-			'<li>演员:Actress A,Actress B</li>',
-			'<li>演员:Actress A <a class="male">Actor X</a>, Actress B <a class="male">Actor Y</a></li>'
-		)
-
-		result = MovieParser.parse_movie_details(male_html)
-
-		assert result is not None
-		assert result['number'] == 'ABC-123'
-		assert result['actresses'] == ['Actress A', 'Actress B']
-		assert result['trailer_url'] == 'https://example.com/trailer.mp4'
-		assert len(result['galleries']) == 2
-
 		result = MovieParser.parse_movie_details('')
 		assert result == {}
 
