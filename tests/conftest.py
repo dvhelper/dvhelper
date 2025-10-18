@@ -107,10 +107,6 @@ def detail_html():
 	'''
 
 @pytest.fixture
-def cookies_file(temp_dir):
-	return Path(temp_dir) / 'cookies.json'
-
-@pytest.fixture
 def crop_image(temp_dir):
 	src_file = Path(temp_dir) / 'source.jpg'
 	dest_file = Path(temp_dir) / 'destination.jpg'
