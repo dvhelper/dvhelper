@@ -345,13 +345,13 @@ class MovieParser():
 		for ul_element in ul_elements:
 			li_elements = ul_element.find_all('li')
 
-			if li_elements:
-				li_contents = []
-				for li in li_elements:
-					for male_a in li.find_all('a', class_='male'):
-						male_a.extract()
-					li_contents.append(li.get_text(strip=True))
-				results = MovieParser.__extract_info_from_list(li_contents)
+			li_contents = []
+			for li in li_elements:
+				for male_a in li.find_all('a', class_='male'):
+					male_a.extract()
+				li_contents.append(li.get_text(strip=True))
+
+			results = MovieParser.__extract_info_from_list(li_contents)
 
 		results['galleries'] = []
 		a_elements = soup.find_all('a', {'data-fancybox': 'gallery'})
