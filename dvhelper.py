@@ -296,10 +296,8 @@ class MovieParser():
 		if not html:
 			return
 
-		from lxml import etree
-
-		parser = etree.HTMLParser()
-		tree = etree.fromstring(html, parser)
+		parser = ET.HTMLParser()
+		tree = ET.fromstring(html, parser)
 		xpath = f'//div[contains(@class, "{config.search_target_class}")]'
 		elements = tree.xpath(xpath)
 
@@ -338,10 +336,8 @@ class MovieParser():
 		if not html:
 			return results
 
-		from lxml import etree
-
-		parser = etree.HTMLParser()
-		tree = etree.fromstring(html, parser)
+		parser = ET.HTMLParser()
+		tree = ET.fromstring(html, parser)
 		xpath = f'//ul[contains(@class, "{config.movie_target_class}")]'
 		ul_elements = tree.xpath(xpath)
 
