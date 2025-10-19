@@ -93,22 +93,11 @@ jobs:
     runs-on: windows-latest
     needs: build
     permissions:
-      contents: write  # Allow write permissions to create releases
+      contents: write # Allow write permissions to create releases
     env:
-      PYTHONIOENCODING: "utf-8"
       TAG_NAME: ${{ inputs.tag_name || github.ref_name }}
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0 # Checkout commit history including tags
-
-      - name: Get commit history
-        run: |
-          Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
-          ./make/get_commit_history.ps1 -TagName ${{ env.TAG_NAME }}
-
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
@@ -122,11 +111,6 @@ jobs:
           name: ${{ env.TAG_NAME }}
           tag_name: ${{ env.TAG_NAME }}
           overwrite_files: true
-          generate_release_notes: false
-          body: |
-            ## 更新内容
-            
-            ${{ env.commits }}
-
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
