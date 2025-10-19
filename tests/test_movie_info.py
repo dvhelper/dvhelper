@@ -26,5 +26,5 @@ def test_movie_info_with_default_values():
 	assert movie_info.title == ''
 	assert movie_info.tags == []
 	assert movie_info.actresses == []
-	assert movie_info.country == '日本'  # 默认值
-	assert movie_info.mpaa == 'NC-17'   # 默认值
+	assert movie_info.country == '日本'
+	assert movie_info.mpaa == 'NC-17'

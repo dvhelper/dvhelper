@@ -38,7 +38,7 @@ def test_scraper_initialize_session_failed():
 		mock_check_cookies.assert_called_once()
 
 #region check_cookies tests
-@pytest.mark.parametrize("cookies_data,expected_result", [
+@pytest.mark.parametrize("cookies_data, expected_result", [
 	([
 		{
 			'name': 'remember_token',
@@ -105,30 +105,27 @@ def test_scraper_check_cookies_error_handling():
 #endregion
 
 #region perform_login tests
-@pytest.mark.parametrize("test_case,chrome_side_effect,wait_side_effect,cookies_file,expected_result,expected_chrome_calls", [
-	# 正常登录场景
+@pytest.mark.parametrize("test_case, chrome_side_effect, wait_side_effect, cookies_file, expected_result, expected_chrome_calls", [
 	("success", 
-	 None,  # 无异常
-	 None,  # 无超时
+	 None,
+	 None,
 	 "cookies.json", 
-	 "session",  # 成功返回session
-	 1,  # Chrome调用1次
+	 "session",
+	 1,
 	),
-	# WebDriver创建失败回退场景
 	("driver_creation_fallback", 
-	 lambda mock_driver: create_driver_fallback_side_effect(mock_driver),  # Chrome创建失败回退
-	 None,  # 无超时
+	 lambda mock_driver: create_driver_fallback_side_effect(mock_driver),
+	 None,
 	 "cookies.json", 
-	 "session",  # 成功返回session
-	 2,  # Chrome调用2次
+	 "session",
+	 2,
 	),
-	# 登录超时失败场景
 	("login_timeout", 
-	 None,  # 无异常
-	 TimeoutException("Login timeout"),  # 超时异常
-	 None,  # 不需要cookies_file
-	 None,  # 失败返回None
-	 1,  # Chrome调用1次
+	 None,
+	 TimeoutException("Login timeout"),
+	 None,
+	 None,
+	 1,
 	),
 ])
 def test_scraper_perform_login(test_case, chrome_side_effect, wait_side_effect, cookies_file,
