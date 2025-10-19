@@ -17,9 +17,8 @@ def test_parse_search_results(search_html, keyword, use_search_html, expected_re
 		mock_config.search_target_class = 'flex flex-col relative hover:bg-zinc-100 hover:dark:bg-zinc-800'
 		mock_config.base_url = 'https://example.com'
 
-		result = None
-		if use_search_html:
-			result = MovieParser.parse_search_results(search_html if use_search_html else '', keyword)
+		search_html = search_html if use_search_html else ''
+		result = MovieParser.parse_search_results(search_html, keyword)
 
 		if expected_result:
 			assert result is not None
