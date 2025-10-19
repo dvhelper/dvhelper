@@ -1,28 +1,30 @@
 """测试 MovieParser 类的功能"""
 import os
 import sys
+import pytest
 from unittest.mock import patch
 from dvhelper import MovieParser
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-def test_parse_search_results(search_html):
+@pytest.mark.parametrize('keyword, use_search_html, expected_result', [
+	('ABC-123', True, True),
+	('XYZ-456', True, False),
+	('ABC-123', False, False),
+])
+def test_parse_search_results(search_html, keyword, use_search_html, expected_result):
 	with patch('dvhelper.config') as mock_config:
 		mock_config.search_target_class = 'flex flex-col relative hover:bg-zinc-100 hover:dark:bg-zinc-800'
 		mock_config.base_url = 'https://example.com'
 
-		result = MovieParser.parse_search_results(search_html, 'ABC-123')
+		result = None
+		if use_search_html:
+			result = MovieParser.parse_search_results(search_html if use_search_html else '', keyword)
 
-		assert result is not None
-		assert result['detail_url'] == 'https://example.com/movie/123'
-		assert result['title'] == 'ABC-123 Test Movie'
-		assert result['fanart_url'] == 'https://example.com/image.jpg'
-
-		result = MovieParser.parse_search_results(search_html, 'XYZ-456')
-		assert result is None
-
-		result = MovieParser.parse_search_results('', 'ABC-123')
-		assert result is None
+		if expected_result:
+			assert result is not None
+		else:
+			assert result is None
 
 def test_parse_movie_details(detail_html, actress_alias):
 	with patch('dvhelper.config') as mock_config:

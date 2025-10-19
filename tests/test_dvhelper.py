@@ -14,6 +14,7 @@ from dvhelper import set_language, get_logger, lazy_import, TqdmOut, HelpOnError
 
 
 @pytest.mark.parametrize("lang, expected_calls, i18n_exists", [
+	# expected_calls: [(call_args, expected_result)]
 	('en_US', [(['dvhelper', 'i18n_path', ['en_US']], True)], True),
 	('fr_FR', [(['dvhelper', 'i18n_path', ['fr_FR']], False), 
 		  (['dvhelper', 'i18n_path', ['en_US']], True)], True),
@@ -484,6 +485,3 @@ def test_main_english_language():
 
 		mock_set_language.assert_called_with('en_US')
 #endregion
-
-def teardown_module(module):
-	pass

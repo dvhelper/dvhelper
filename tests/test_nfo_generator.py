@@ -1,14 +1,11 @@
 """测试 NFOGenerator 类的功能"""
 import os
 import sys
-from pathlib import Path
-from unittest.mock import patch, mock_open
-import xml.etree.ElementTree as ET
 from xml.dom import minidom
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from dvhelper import NFOGenerator, MovieInfo
+from dvhelper import NFOGenerator
 
 
 def test_nfo_generator_with_movie_info(movie_info):
