@@ -19,11 +19,8 @@ from dataclasses import dataclass, field
 import locale
 import gettext
 
-# XML处理相关导入
-from xml.dom import minidom
-import xml.etree.ElementTree as ET
-
 # 第三方库导入，其它第三方库由 lazy_import() 导入
+from lxml import etree as ET
 from rich_argparse import RawTextRichHelpFormatter
 from colorama import Fore, Style
 
@@ -38,7 +35,7 @@ sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 #endregion
 
 
-__version__ = '0.0.9.1'
+__version__ = '0.0.9.2'
 __version_info__ = tuple(int(x) for x in __version__.split('.'))
 
 
@@ -225,9 +222,10 @@ class NFOGenerator():
 
 		# 影片编号作为唯一标识
 		if movie_info.number:
-			uniqueid        = ET.SubElement(self.root, 'uniqueid')
-			uniqueid.text   = movie_info.number
-			uniqueid.attrib = {'type': 'num', 'default': 'true'}
+			uniqueid = ET.SubElement(self.root, 'uniqueid')
+			uniqueid.text = movie_info.number
+			uniqueid.set('type', 'num')
+			uniqueid.set('default', 'true')
 
 		# 分类和标签
 		if movie_info.tags:
@@ -268,15 +266,17 @@ class NFOGenerator():
 		Args:
 			output_path: 输出文件路径
 		"""
-		# 生成格式化的XML字符串
-		rough_string = ET.tostring(self.root, 'utf-8')
-		reparsed = minidom.parseString(rough_string)
-		pretty_xml = reparsed.toprettyxml(
-			indent='    ', encoding='utf-8', standalone=True
+		ET.indent(self.root, space='    ')
+		pretty_xml = ET.tostring(
+			self.root,
+			encoding='utf-8',
+			pretty_print=True,
+			xml_declaration=True,
+			standalone=True
 		).replace(b'&amp;', b'&')
 
-		with open(output_path, 'wb') as f:
-			f.write(pretty_xml)
+		with open(output_path, 'w', encoding='utf-8') as f:
+			f.write(pretty_xml.decode('utf-8'))
 
 
 class MovieParser():
@@ -296,21 +296,21 @@ class MovieParser():
 		if not html:
 			return
 
-		from bs4 import BeautifulSoup
-
-		soup = BeautifulSoup(html, 'html.parser')
-		elements = soup.find_all(class_=config.search_target_class)
+		parser = ET.HTMLParser()
+		tree = ET.fromstring(html, parser)
+		xpath = f'//div[contains(@class, "{config.search_target_class}")]'
+		elements = tree.xpath(xpath)
 
 		for element in elements:
-			a_tag = element.find('a')
+			a_tag = element.find('./a')
 
-			if not a_tag:
+			if a_tag is None:
 				continue
 
-			href: str    = a_tag.get('href', '')
-			title: str   = a_tag.get('title', '').strip()
-			img_tag      = a_tag.find('img')
-			img_src: str = img_tag.get('src', '')
+			href:    str = a_tag.get('href', '')
+			title:   str = a_tag.get('title', '').strip()
+			img_tag      = a_tag.find('./img')
+			img_src: str = img_tag.get('src', '') if img_tag is not None else ''
 
 			if keyword.lower() in title.lower():
 				return {
@@ -336,27 +336,27 @@ class MovieParser():
 		if not html:
 			return results
 
-		from bs4 import BeautifulSoup
+		parser = ET.HTMLParser()
+		tree = ET.fromstring(html, parser)
+		xpath = f'//ul[contains(@class, "{config.movie_target_class}")]'
+		ul_elements = tree.xpath(xpath)
 
-		soup = BeautifulSoup(html, 'html.parser')
-		ul_elements = soup.find_all('ul', class_=config.movie_target_class)
-
-		# 提取影片详情
 		for ul_element in ul_elements:
-			li_elements = ul_element.find_all('li')
+			li_elements = ul_element.findall('./li')
 
 			li_contents = []
 			for li in li_elements:
-				for male_a in li.find_all('a', class_='male'):
-					male_a.extract()
-				li_contents.append(li.get_text(strip=True))
+				male_elements = li.xpath('./a[@class="male"]')
+				for male_a in male_elements:
+					li.remove(male_a)
+				text_content = ''.join(li.xpath('.//text()')).strip()
+				li_contents.append(text_content)
 
 			results = MovieParser.__extract_info_from_list(li_contents)
 
 		results['galleries'] = []
-		a_elements = soup.find_all('a', {'data-fancybox': 'gallery'})
+		a_elements = tree.xpath('//a[@data-fancybox="gallery"]')
 
-		# 提取预告片和剧照
 		for a_tag in a_elements:
 			href: str = a_tag.get('href', '')
 			data_caption: str = a_tag.get('data-caption', '').strip()
