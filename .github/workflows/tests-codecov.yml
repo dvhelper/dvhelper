@@ -52,10 +52,17 @@ jobs:
         continue-on-error: true
 
       - name: Run tests
-        run: poetry run pytest --cov --cov-branch --cov-report=xml
+        run: poetry run pytest --cov --cov-branch --cov-report=xml --junitxml=junit.xml
 
-      - name: Upload results to Codecov
+      - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: dvhelper/dvhelper
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: dvhelper/dvhelper
