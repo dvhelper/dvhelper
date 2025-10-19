@@ -52,7 +52,7 @@ jobs:
         continue-on-error: true
 
       - name: Run tests
-        run: poetry run pytest --cov --cov-branch --cov-report=xml --junitxml=junit.xml
+        run: poetry run pytest -c NONE --cov --cov-branch --cov-report=xml --junitxml=junit.xml
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5

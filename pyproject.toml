@@ -44,4 +44,4 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-addopts = "--cache-clear"
+addopts = "--cache-clear --cov --cov-branch --cov-report=html tests/ -vv --durations=10"
