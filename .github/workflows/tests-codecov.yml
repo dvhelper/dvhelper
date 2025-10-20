@@ -2,7 +2,17 @@ name: Run tests and upload coverage
 
 on:
   push:
+    paths:
+      - '**.py'
+      - 'tests/**'
+      - 'pyproject.toml'
+      - 'poetry.lock'
   pull_request:
+    paths:
+      - '**.py'
+      - 'tests/**'
+      - 'pyproject.toml'
+      - 'poetry.lock'
   workflow_dispatch:
 
 jobs:
