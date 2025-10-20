@@ -40,8 +40,25 @@ dev = [
     "pyinstaller (>=6.16.0,<7.0.0)",
     "babel (>=2.17.0,<3.0.0)",
     "pytest (>=8.4.2,<9.0.0)",
-    "pytest-cov (>=7.0.0,<8.0.0)"
+    "pytest-cov (>=7.0.0,<8.0.0)",
+    "pylint (>=4.0.1,<5.0.0)",
 ]
 
 [tool.pytest.ini_options]
 addopts = "--cache-clear --cov --cov-branch --cov-report=html tests/ -vv --durations=10"
+
+[tool.pylint.main]
+disable = [
+    "too-few-public-methods",
+    "too-many-instance-attributes",
+    "undefined-variable",
+    "c-extension-no-member",
+]
+
+[tool.pylint.format]
+expected-line-ending-format = "CRLF"
+indent-string = "\t"
+max-line-length = 88
+
+[tool.pylint.reports]
+output-format = "colorized"
