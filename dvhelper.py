@@ -35,7 +35,7 @@ sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 #endregion
 
 
-__version__ = '0.0.9.2'
+__version__ = '0.0.9.3'
 __version_info__ = tuple(int(x) for x in __version__.split('.'))
 
 
@@ -302,14 +302,14 @@ class MovieParser():
 		elements = tree.xpath(xpath)
 
 		for element in elements:
-			a_tag = element.find('./a')
+			a_tag = element.findall('./a')
 
 			if a_tag is None:
 				continue
 
-			href:    str = a_tag.get('href', '')
-			title:   str = a_tag.get('title', '').strip()
-			img_tag      = a_tag.find('./img')
+			href:    str = a_tag[0].get('href', '')
+			title:   str = a_tag[1].get('title', '').strip()
+			img_tag      = a_tag[0].find('./img')
 			img_src: str = img_tag.get('src', '') if img_tag is not None else ''
 
 			if keyword.lower() in title.lower():
